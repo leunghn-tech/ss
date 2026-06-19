@@ -251,8 +251,8 @@
                 <div className="data-row"><span className="data-label">風險 / 報酬比 (R/R)</span><span className="data-value">{t.riskPercent || '--'}% / {t.rewardPercent || '--'}% ({t.rrRatio || '--'})</span></div>
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
                   <div className="flex gap-2">
-                    <span className="badge bg-emerald-50 text-emerald-700 border border-emerald-100">L: {t.edges?.long??0}</span>
-                    <span className="badge bg-rose-50 text-rose-700 border border-rose-100">S: {t.edges?.short??0}</span>
+                    <span className="badge bg-emerald-50 text-emerald-700 border border-emerald-100">L: {t.edges && t.edges.long !== undefined ? t.edges.long : 0}</span>
+                    <span className="badge bg-rose-50 text-rose-700 border border-rose-100">S: {t.edges && t.edges.short !== undefined ? t.edges.short : 0}</span>
                     {t.maxShares && <span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.maxShares}股</span>}
                   </div>
                   <button onClick={(e) => openBuyModal(t, e)} className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold btn-press shadow-sm">確認買入</button>
@@ -264,7 +264,10 @@
                 <div>
                   <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.strategy}</span></div>
                   <div className="text-[10px] text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong></div>
-                  <div className="flex gap-1.5 mt-1.5"><span className="badge bg-emerald-50 text-emerald-700">L: {t.edges?.long??0}</span><span className="badge bg-rose-50 text-rose-700">S: {t.edges?.short??0}</span></div>
+                  <div className="flex gap-1.5 mt-1.5">
+                    <span className="badge bg-emerald-50 text-emerald-700">L: {t.edges && t.edges.long !== undefined ? t.edges.long : 0}</span>
+                    <span className="badge bg-rose-50 text-rose-700">S: {t.edges && t.edges.short !== undefined ? t.edges.short : 0}</span>
+                  </div>
                 </div>
                 <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold btn-press">檢討賣出</button>
               </div>
