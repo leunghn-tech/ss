@@ -291,7 +291,7 @@
           
           <Modal isOpen={modal.isOpen && modal.type === 'delete'} onClose={closeModal} title="確認刪除項目" actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { onDelete(modal.trade.id); closeModal(); }} className="px-4 py-2 bg-rose-500 text-white rounded-xl font-bold text-xs">確定刪除</button></>}>確定要將 {modal.trade?.ticker} 從清單中完全移除嗎？</Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'buy'} onClose={closeModal} title={`買入紀錄：${modal.trade?.ticker}`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const input = document.getElementById('buy-price-input'); if (input) handleBuyConfirm(input.value); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認交易</button></>}>
-            <div className="space-y-3 pt-1"><p className="text-xs font-semibold text-gray-500">計畫進場價: <strong className="text-gray-800">${modal.trade?.targetBuyPrice?.toFixed(2)}</strong></p><label className="block text-xs font-bold text-gray-700">請輸入實際買入成交價：</label><input id="buy-price-input" type="number" step="0.01" defaultValue={modal.trade?.targetBuyPrice?.toFixed(2)} className="w-full p-3 border-2 border-indigo-100 rounded-xl text-lg font-bold text-indigo-700 text-center outline-none focus:border-indigo-500" placeholder="0.00" autoFocus /></div>
+            <div className="space-y-3 pt-1"><p className="text-xs font-semibold text-gray-500">計畫進場價: <strong className="text-gray-800">${modal.trade?.targetBuyPrice?.toFixed(2)}</strong></p><label className="block text-xs font-bold text-gray-700">請輸入實際買入成交價：</label><input id="buy-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.targetBuyPrice?.toFixed(2)} className="w-full p-3 border-2 border-indigo-100 rounded-xl text-lg font-bold text-indigo-700 text-center outline-none focus:border-indigo-500" placeholder="0.00" autoFocus /></div>
           </Modal>
         </div>
       );
@@ -402,7 +402,7 @@
                 <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫日期</label><input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)} className="w-full p-3 border rounded-xl text-xs font-bold text-gray-600" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫買入價</label><input type="number" step="0.01" value={targetBuyPrice} onChange={e => setTargetBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-extrabold text-indigo-600" placeholder="0.00" /></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫買入價</label><input type="number" inputmode="decimal" step="0.01" value={targetBuyPrice} onChange={e => setTargetBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-extrabold text-indigo-600" placeholder="0.00" /></div>
                 <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">採用策略</label><select value={strategy} onChange={e => setStrategy(e.target.value)} className="w-full p-3 border rounded-xl bg-white text-xs font-bold text-gray-600">{STRATEGY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
               </div>
               
@@ -413,10 +413,10 @@
                 </button>
                 {accordionOpen && (
                   <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3 bg-white animate-fade-in-up">
-                    <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">總投資金額 (HKD)</label><input type="number" value={totalCapital} onChange={e => setTotalCapital(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold" /></div>
+                    <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">總投資金額 (HKD)</label><input type="number" inputmode="decimal" value={totalCapital} onChange={e => setTotalCapital(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold" /></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">設定止損價</label><input type="number" step="0.01" value={stopLossPrice} onChange={e => setStopLossPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-rose-500" placeholder="0.00" /></div>
-                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">目標止盈價</label><input type="number" step="0.01" value={targetPrice} onChange={e => setTargetPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-emerald-500" placeholder="0.00" /></div>
+                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">設定止損價</label><input type="number" inputmode="decimal" step="0.01" value={stopLossPrice} onChange={e => setStopLossPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-rose-500" placeholder="0.00" /></div>
+                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">目標止盈價</label><input type="number" inputmode="decimal" step="0.01" value={targetPrice} onChange={e => setTargetPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-emerald-500" placeholder="0.00" /></div>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-2.5 flex justify-between items-center text-xs">
                       <div className="text-gray-500 font-medium">單筆最大風險 <strong className="text-rose-500">{riskPercent}%</strong> | 預估利潤 <strong className="text-emerald-500">{rewardPercent}%</strong></div>
@@ -453,7 +453,7 @@
                                   return (
                                     <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
                                       <span className="text-xs font-black text-gray-400 uppercase w-10">{key.replace('ma','MA ')}</span>
-                                      <input type="number" step="0.01" value={val} onChange={e => handlePriceChange(item.id, e.target.value, key)} className="flex-1 min-w-0 p-2 text-sm border rounded bg-white text-center font-bold text-gray-800" placeholder="0.0" />
+                                      <input type="number" inputmode="decimal" step="0.01" value={val} onChange={e => handlePriceChange(item.id, e.target.value, key)} className="flex-1 min-w-0 p-2 text-sm border rounded bg-white text-center font-bold text-gray-800" placeholder="0.0" />
                                       {detail && <span className={`px-1.5 py-1 rounded text-xs font-black w-12 text-center ${detail.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{detail.edge==='long'?'L':'S'}</span>}
                                     </div>
                                   );
@@ -467,7 +467,7 @@
                           <div key={item.id} className="flex flex-col gap-1.5 pt-2 border-t border-gray-50/50 first:border-0 first:pt-0">
                             <span className="text-xs font-bold text-gray-700">{item.label}</span>
                             <div className="flex items-center gap-2">
-                              <input type="number" step="0.01" value={priceInputs[item.id] || ''} onChange={e => handlePriceChange(item.id, e.target.value)} className="w-full p-2.5 text-sm border rounded-xl font-bold text-gray-800" placeholder="輸入價格" />
+                              <input type="number" inputmode="decimal" step="0.01" value={priceInputs[item.id] || ''} onChange={e => handlePriceChange(item.id, e.target.value)} className="w-full p-2.5 text-sm border rounded-xl font-bold text-gray-800" placeholder="輸入價格" />
                               {answer && <span className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${answer.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{answer.edge==='long'?'📈':'📉'} {answer.text}</span>}
                             </div>
                           </div>
@@ -544,10 +544,10 @@
               <div className="text-right"><p className="text-xs font-black text-gray-400 uppercase tracking-wide">計畫買入日</p><p className="font-extrabold text-sm text-gray-700 mt-0.5">{formatDateShort(trade.buyDate)}</p></div>
             </div>
             <div className="space-y-4 pt-2">
-              <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">實際成交買入價 (可根據手續費或實際價格微調)</label><input type="number" step="0.01" value={actualBuyPrice} onChange={e => setActualBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-bold bg-slate-50" /></div>
+              <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">實際成交買入價 (可根據手續費或實際價格微調)</label><input type="number" inputmode="decimal" step="0.01" value={actualBuyPrice} onChange={e => setActualBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-bold bg-slate-50" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">賣出日期</label><input type="date" value={sellDate} onChange={e => setSellDate(e.target.value)} className="w-full p-3 border rounded-xl text-xs font-bold text-gray-600" /></div>
-                <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">賣出成交價</label><input type="number" step="0.01" value={sellPrice} onChange={e => setSellPrice(e.target.value)} className="w-full p-3 border-2 border-indigo-200 rounded-xl text-sm font-extrabold text-indigo-700 focus:border-indigo-500 bg-indigo-50/20" placeholder="0.00" /></div>
+                <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">賣出成交價</label><input type="number" inputmode="decimal" step="0.01" value={sellPrice} onChange={e => setSellPrice(e.target.value)} className="w-full p-3 border-2 border-indigo-200 rounded-xl text-sm font-extrabold text-indigo-700 focus:border-indigo-500 bg-indigo-50/20" placeholder="0.00" /></div>
               </div>
               <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">交易檢討及學習筆記 (Lessons Learned)</label><textarea rows="5" value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} className="w-full p-3 border rounded-xl text-xs font-medium leading-relaxed" placeholder="例如：我的買入判斷與紀律遵守如何？停利是否果斷？有哪些需要改進的地方？" /></div>
             </div>
