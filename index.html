@@ -356,6 +356,7 @@
       });
       const [accordionOpen, setAccordionOpen] = useState(false);
       const [modal, setModal] = useState({ isOpen: false, message: '' });
+      const [riskWarning, setRiskWarning] = useState({ isOpen: false, warnings: [], pendingStatus: null });
 
       const buyP = parseFloat(targetBuyPrice);
       const isUSStock = /^[A-Za-z.]+$/.test(ticker.trim());
@@ -416,17 +417,32 @@
         maxAmount = maxShares * buyP;
       }
 
-      const handleSave = (status = 'watchlist') => {
-        if (!ticker.trim() || !buyP || buyP <= 0) {
-          setModal({ isOpen: true, message: '請務必填寫股票代號，以及合理的預計進場價格。' });
-          return;
-        }
+      const forceSave = (status) => {
         onSave({
           ticker: ticker.trim().toUpperCase(), buyDate, targetBuyPrice: buyP, strategy,
           answers, edges: currentEdges, priceInputs,
           totalCapital: capitalHKD, stopLossPrice: parseFloat(stopLossPrice) || 0, targetPrice: parseFloat(targetPrice) || 0,
           isUSStock, effectiveCapital, maxShares, maxAmount, rrRatio, riskPercent, rewardPercent
         }, status);
+      };
+
+      const handleSave = (status = 'watchlist') => {
+        if (!ticker.trim() || !buyP || buyP <= 0) {
+          setModal({ isOpen: true, message: '請務必填寫股票代號，以及合理的預計進場價格。' });
+          return;
+        }
+
+        const warnings = [];
+        if (!stopLossPrice || !targetPrice) warnings.push('未設定完整的止損或止盈價，缺乏出場計畫。');
+        if (rrRatio !== '--' && parseFloat(rrRatio) < 2.0) warnings.push(`風報比 (${rrRatio}) 低於建議的 2.0，長期期望值偏低。`);
+        if (riskPercent !== '--' && parseFloat(riskPercent) > 8.0) warnings.push(`止損幅度 (${riskPercent}%) 過大，單筆風險過高。`);
+        if (currentEdges.short > currentEdges.long) warnings.push(`系統評分顯示技術劣勢 (S:${currentEdges.short}) 多於優勢 (L:${currentEdges.long})。`);
+
+        if (warnings.length > 0) {
+          setRiskWarning({ isOpen: true, warnings, pendingStatus: status });
+        } else {
+          forceSave(status);
+        }
       };
 
       return (
@@ -553,6 +569,14 @@
             </div>
           </div>
           <Modal isOpen={modal.isOpen} onClose={() => setModal({ isOpen: false })} title="提示" actions={<button onClick={() => setModal({ isOpen: false })} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">好</button>}>{modal.message}</Modal>
+          <Modal isOpen={riskWarning.isOpen} onClose={() => setRiskWarning({ isOpen: false, warnings: [], pendingStatus: null })} title="⚠️ 高風險交易警告" actions={<><button onClick={() => { forceSave(riskWarning.pendingStatus); setRiskWarning({ isOpen: false, warnings: [], pendingStatus: null }); }} className="px-4 py-2 text-xs text-gray-400 font-medium underline">了解風險，強制儲存</button><button onClick={() => setRiskWarning({ isOpen: false, warnings: [], pendingStatus: null })} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">返回修改計畫</button></>}>
+            <div className="space-y-2">
+              <p className="text-rose-600 font-bold mb-2">系統偵測到此交易計畫違反了您的交易紀律：</p>
+              <ul className="space-y-1.5 text-gray-700">
+                {riskWarning.warnings.map((w, i) => <li key={i} className="flex gap-1.5"><span className="text-rose-500">🔴</span> {w}</li>)}
+              </ul>
+            </div>
+          </Modal>
         </div>
       );
     }
@@ -601,6 +625,7 @@
             </div>
           </div>
           <Modal isOpen={modal.isOpen} onClose={() => setModal({ isOpen: false })} title="提示" actions={<button onClick={() => setModal({ isOpen: false })} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">好</button>}>{modal.message}</Modal>
+
         </div>
       );
     }
