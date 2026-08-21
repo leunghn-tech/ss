@@ -238,6 +238,18 @@
       const avgPnL = totalComp > 0 ? (completed.reduce((s, t) => s + (t.pnlPercent || 0), 0) / totalComp).toFixed(2) : '--';
       const [modal, setModal] = useState({ isOpen: false, type: null, trade: null });
 
+      const handleNewTradeClick = () => {
+        // Over-trading check: 3+ losses in the last 24 hours
+        const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
+        const recentLosses = completed.filter(t => t.pnlPercent < 0 && t.createdAt && t.createdAt >= oneDayAgo);
+
+        if (recentLosses.length >= 3) {
+          setModal({ isOpen: true, type: 'cooldown' });
+        } else {
+          onNew();
+        }
+      };
+
       const openDeleteModal = (t, e) => { e.stopPropagation(); setModal({ isOpen: true, type: 'delete', trade: t }); };
       const openBuyModal = (t, e) => { e.stopPropagation(); setModal({ isOpen: true, type: 'buy', trade: t }); };
       const closeModal = () => setModal({ isOpen: false });
@@ -326,12 +338,18 @@
           
           <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-50 via-gray-50 p-4 safe-bottom">
             <div className="app-container relative">
-              <button onClick={onNew} className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 text-white py-4 rounded-2xl font-black text-base shadow-lg btn-press flex items-center justify-center gap-2">
+              <button onClick={handleNewTradeClick} className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 text-white py-4 rounded-2xl font-black text-base shadow-lg btn-press flex items-center justify-center gap-2">
                 <Icons.Plus size={20} /> 新增交易前檢視
               </button>
             </div>
           </div>
           
+          <Modal isOpen={modal.isOpen && modal.type === 'cooldown'} onClose={closeModal} title="⏸️ 冷靜期提示" actions={<><button onClick={() => { closeModal(); onNew(); }} className="px-4 py-2 text-xs text-gray-400 font-medium underline">我已冷靜，繼續新增</button><button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">好的，我休息一下</button></>}>
+            <div className="space-y-2 text-gray-700">
+              <p>系統偵測到您在過去 24 小時內已記錄了 <strong>3 筆以上的虧損交易</strong>。</p>
+              <p className="font-bold text-rose-600">為了避免報復性交易 (Revenge Trading)，建議您暫停交易，重新檢視大盤趨勢與交易策略。</p>
+            </div>
+          </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'delete'} onClose={closeModal} title="確認刪除項目" actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { onDelete(modal.trade.id); closeModal(); }} className="px-4 py-2 bg-rose-500 text-white rounded-xl font-bold text-xs">確定刪除</button></>}>確定要將 {modal.trade?.ticker} 從清單中完全移除嗎？</Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'buy'} onClose={closeModal} title={`買入紀錄：${modal.trade?.ticker}`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const input = document.getElementById('buy-price-input'); if (input) handleBuyConfirm(input.value); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認交易</button></>}>
             <div className="space-y-3 pt-1"><p className="text-xs font-semibold text-gray-500">計畫進場價: <strong className="text-gray-800">${modal.trade?.targetBuyPrice?.toFixed(2)}</strong></p><label className="block text-xs font-bold text-gray-700">請輸入實際買入成交價：</label><input id="buy-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.targetBuyPrice?.toFixed(2)} className="w-full p-3 border-2 border-indigo-100 rounded-xl text-lg font-bold text-indigo-700 text-center outline-none focus:border-indigo-500" placeholder="0.00" autoFocus /></div>
@@ -596,7 +614,27 @@
         if (isNaN(sp) || sp <= 0) { setModal({ isOpen: true, message: '請輸入有效的實際賣出價格。' }); return; }
         const holdingDays = calcHoldingDays(trade.buyDate, sellDate);
         const pnlPercent = calcPnL(bp, sp);
-        onSave({ actualBuyPrice: bp, sellDate, sellPrice: sp, reviewNotes, holdingDays, pnlPercent });
+
+        let disciplineScore = 5;
+        let disciplineReason = '完全遵守計畫';
+        const plannedStop = parseFloat(trade.stopLossPrice);
+        if (plannedStop > 0) {
+          if (sp < plannedStop) {
+            const slippage = ((plannedStop - sp) / plannedStop) * 100;
+            if (slippage > 2) {
+              disciplineScore = 2;
+              disciplineReason = `嚴重凹單：賣出價低於止損價 ${slippage.toFixed(1)}%`;
+            } else {
+              disciplineScore = 4;
+              disciplineReason = '略有滑價但有執行停損';
+            }
+          } else if (sp === plannedStop) {
+            disciplineScore = 5;
+            disciplineReason = '精準執行停損';
+          }
+        }
+
+        onSave({ actualBuyPrice: bp, sellDate, sellPrice: sp, reviewNotes, holdingDays, pnlPercent, disciplineScore, disciplineReason });
       };
 
       return (
@@ -652,6 +690,19 @@
                 <div><p className="opacity-70 text-xs font-bold uppercase mb-0.5">持倉天數</p><p className="font-extrabold text-base">{trade.holdingDays} 天</p></div>
               </div>
             </div>
+            {trade.disciplineScore !== undefined && (
+              <div className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 space-y-2 animate-fade-in-up">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">🎯 紀律遵守度</h3>
+                  <div className="flex gap-0.5 text-amber-400 text-sm">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span key={i} className={i < trade.disciplineScore ? 'opacity-100' : 'opacity-20 grayscale'}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+                <p className={`text-xs font-bold ${trade.disciplineScore < 3 ? 'text-rose-600' : 'text-emerald-600'}`}>{trade.disciplineReason}</p>
+              </div>
+            )}
             <div className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 space-y-2 animate-fade-in-up">
               <h3 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">💡 學習筆記 (Lessons Learned)</h3>
               <p className="text-xs text-gray-700 leading-relaxed font-semibold whitespace-pre-wrap bg-gray-50/50 p-3 rounded-xl border border-gray-100">{trade.reviewNotes || '無任何心得筆記。'}</p>
