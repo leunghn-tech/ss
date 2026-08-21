@@ -225,9 +225,9 @@
           <header className="bg-gradient-to-r from-purple-700 to-indigo-600 text-white px-5 pt-6 pb-6 rounded-b-[2.5rem] shadow-lg safe-bottom">
             <h1 className="text-2xl font-black tracking-tight">M.E.T.S. 股票交易檢討</h1>
             <div className="grid grid-cols-3 gap-3 mt-4">
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className="text-xl font-extrabold">{totalComp}</p><p className="text-[10px] text-white/80 mt-0.5">總交易</p></div>
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-[10px] text-white/80 mt-0.5">勝率</p></div>
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(avgPnL) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{parseFloat(avgPnL) >= 0 ? '+' : ''}{avgPnL}%</p><p className="text-[10px] text-white/80 mt-0.5">平均盈虧</p></div>
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className="text-xl font-extrabold">{totalComp}</p><p className="text-xs text-white/80 mt-0.5">總交易</p></div>
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-xs text-white/80 mt-0.5">勝率</p></div>
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(avgPnL) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{parseFloat(avgPnL) >= 0 ? '+' : ''}{avgPnL}%</p><p className="text-xs text-white/80 mt-0.5">平均盈虧</p></div>
             </div>
           </header>
           
@@ -261,7 +261,7 @@
               <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex justify-between items-center animate-fade-in-up cursor-pointer hover:border-purple-200 transition-colors">
                 <div>
                   <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.strategy}</span></div>
-                  <div className="text-[10px] text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong></div>
+                  <div className="text-xs text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong></div>
                   <div className="flex gap-1.5 mt-1.5"><span className="badge bg-emerald-50 text-emerald-700">L: {t.edges?.long??0}</span><span className="badge bg-rose-50 text-rose-700">S: {t.edges?.short??0}</span></div>
                 </div>
                 <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold btn-press">檢討賣出</button>
@@ -273,7 +273,7 @@
                 <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer animate-fade-in-up hover:border-purple-200 transition-colors">
                   <div>
                     <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className={`badge ${isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{isProfit ? '📈 獲利' : '📉 虧損'}</span></div>
-                    <p className="text-[10px] text-gray-400 font-semibold mt-1">持倉 {t.holdingDays}天 | {formatDateShort(t.buyDate)} ➜ {formatDateShort(t.sellDate)}</p>
+                    <p className="text-xs text-gray-400 font-semibold mt-1">持倉 {t.holdingDays}天 | {formatDateShort(t.buyDate)} ➜ {formatDateShort(t.sellDate)}</p>
                   </div>
                   <p className={`text-xl font-black ${isProfit ? 'gradient-text-profit' : 'gradient-text-loss'}`}>{isProfit ? '+' : ''}{t.pnlPercent.toFixed(2)}%</p>
                 </div>
@@ -398,32 +398,32 @@
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-44">
             <div className="bg-white p-4 rounded-3xl border border-gray-100 card-shadow-sm space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">股票代號</label><input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} className="w-full p-3 border rounded-xl text-lg font-black tracking-tight uppercase" placeholder="AAPL" /></div>
-                <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫日期</label><input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)} className="w-full p-3 border rounded-xl text-xs font-bold text-gray-600" /></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">股票代號</label><input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} className="w-full p-3 border rounded-xl text-lg font-black tracking-tight uppercase" placeholder="AAPL" /></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫日期</label><input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)} className="w-full p-3 border rounded-xl text-xs font-bold text-gray-600" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫買入價</label><input type="number" step="0.01" value={targetBuyPrice} onChange={e => setTargetBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-extrabold text-indigo-600" placeholder="0.00" /></div>
-                <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">採用策略</label><select value={strategy} onChange={e => setStrategy(e.target.value)} className="w-full p-3 border rounded-xl bg-white text-xs font-bold text-gray-600">{STRATEGY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">計畫買入價</label><input type="number" step="0.01" value={targetBuyPrice} onChange={e => setTargetBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-extrabold text-indigo-600" placeholder="0.00" /></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">採用策略</label><select value={strategy} onChange={e => setStrategy(e.target.value)} className="w-full p-3 border rounded-xl bg-white text-xs font-bold text-gray-600">{STRATEGY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
               </div>
               
               <div className="border rounded-2xl overflow-hidden bg-slate-50/50">
                 <button onClick={() => setAccordionOpen(!accordionOpen)} className="w-full flex items-center justify-between p-3 font-extrabold text-xs text-gray-700">
-                  <span className="flex items-center gap-1.5">💰 資金控管與風報比試算 {isUSStock && <span className="text-indigo-600 font-bold ml-1 text-[10px]">≈ 美元 ${effectiveCapital.toFixed(0)}</span>}</span>
+                  <span className="flex items-center gap-1.5">💰 資金控管與風報比試算 {isUSStock && <span className="text-indigo-600 font-bold ml-1 text-xs">≈ 美元 ${effectiveCapital.toFixed(0)}</span>}</span>
                   {accordionOpen ? <Icons.ChevronUp size={14} /> : <Icons.ChevronDown size={14} />}
                 </button>
                 {accordionOpen && (
                   <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3 bg-white animate-fade-in-up">
-                    <div><label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">總投資金額 (HKD)</label><input type="number" value={totalCapital} onChange={e => setTotalCapital(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold" /></div>
+                    <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">總投資金額 (HKD)</label><input type="number" value={totalCapital} onChange={e => setTotalCapital(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold" /></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div><label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">設定止損價</label><input type="number" step="0.01" value={stopLossPrice} onChange={e => setStopLossPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-rose-500" placeholder="0.00" /></div>
-                      <div><label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">目標止盈價</label><input type="number" step="0.01" value={targetPrice} onChange={e => setTargetPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-emerald-500" placeholder="0.00" /></div>
+                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">設定止損價</label><input type="number" step="0.01" value={stopLossPrice} onChange={e => setStopLossPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-rose-500" placeholder="0.00" /></div>
+                      <div><label className="text-xs font-bold text-gray-400 uppercase block mb-1">目標止盈價</label><input type="number" step="0.01" value={targetPrice} onChange={e => setTargetPrice(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs font-bold text-emerald-500" placeholder="0.00" /></div>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-2.5 flex justify-between items-center text-xs">
                       <div className="text-gray-500 font-medium">單筆最大風險 <strong className="text-rose-500">{riskPercent}%</strong> | 預估利潤 <strong className="text-emerald-500">{rewardPercent}%</strong></div>
                       <div className="font-extrabold text-gray-700">R/R 比: <strong className="text-indigo-600 text-sm">{rrRatio}</strong></div>
                     </div>
                     {maxShares !== null && (
-                      <div className="p-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-bold leading-normal text-center shadow-md shadow-indigo-100">
+                      <div className="p-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold leading-normal text-center shadow-md shadow-indigo-100">
                         依風控 0.5% 計算：建議買入 <strong className="text-sm underline mx-1">{maxShares}</strong> 股 (約使用資金 ${maxAmount.toFixed(2)})
                       </div>
                     )}
@@ -451,10 +451,10 @@
                                 {Object.entries(priceInputs.s_ma_support).map(([key, val]) => {
                                   const detail = answer?.details?.find(d => d.key === key);
                                   return (
-                                    <div key={key} className="flex items-center gap-1.5 bg-gray-50 p-1.5 rounded-xl border border-gray-100">
-                                      <span className="text-[9px] font-black text-gray-400 uppercase w-9">{key.replace('ma','MA ')}</span>
-                                      <input type="number" step="0.01" value={val} onChange={e => handlePriceChange(item.id, e.target.value, key)} className="w-14 p-1 text-xs border rounded bg-white text-center font-bold text-gray-800" placeholder="0.0" />
-                                      {detail && <span className={`px-1 py-0.5 rounded text-[9px] font-black flex-1 text-center truncate ${detail.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{detail.edge==='long'?'L':'S'} {detail.pct ? `${detail.pct.toFixed(0)}%`:''}</span>}
+                                    <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                                      <span className="text-xs font-black text-gray-400 uppercase w-10">{key.replace('ma','MA ')}</span>
+                                      <input type="number" step="0.01" value={val} onChange={e => handlePriceChange(item.id, e.target.value, key)} className="flex-1 min-w-0 p-2 text-sm border rounded bg-white text-center font-bold text-gray-800" placeholder="0.0" />
+                                      {detail && <span className={`px-1.5 py-1 rounded text-xs font-black w-12 text-center ${detail.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{detail.edge==='long'?'L':'S'}</span>}
                                     </div>
                                   );
                                 })}
@@ -464,11 +464,11 @@
                         }
                         const answer = answers[item.id];
                         return (
-                          <div key={item.id} className="flex items-center justify-between gap-2 pt-2 border-t border-gray-50/50 first:border-0 first:pt-0">
+                          <div key={item.id} className="flex flex-col gap-1.5 pt-2 border-t border-gray-50/50 first:border-0 first:pt-0">
                             <span className="text-xs font-bold text-gray-700">{item.label}</span>
-                            <div className="flex items-center gap-1.5">
-                              <input type="number" step="0.01" value={priceInputs[item.id] || ''} onChange={e => handlePriceChange(item.id, e.target.value)} className="w-20 p-1.5 text-xs border rounded-xl text-center font-bold text-gray-800" placeholder="價格" />
-                              {answer && <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${answer.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{answer.edge==='long'?'📈':'📉'} {answer.text}</span>}
+                            <div className="flex items-center gap-2">
+                              <input type="number" step="0.01" value={priceInputs[item.id] || ''} onChange={e => handlePriceChange(item.id, e.target.value)} className="w-full p-2.5 text-sm border rounded-xl font-bold text-gray-800" placeholder="輸入價格" />
+                              {answer && <span className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${answer.edge==='long'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>{answer.edge==='long'?'📈':'📉'} {answer.text}</span>}
                             </div>
                           </div>
                         );
@@ -482,7 +482,7 @@
                             {item.options.map((opt, oIdx) => {
                               const isSel = selected?.text === opt.text;
                               return (
-                                <button key={oIdx} onClick={() => handleOptionSelect(item.id, opt)} className={`px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold transition-all btn-press ${isSel ? 'chip-active' : 'chip-inactive'}`}>{opt.text}</button>
+                                <button key={oIdx} onClick={() => handleOptionSelect(item.id, opt)} className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all btn-press ${isSel ? 'chip-active' : 'chip-inactive'}`}>{opt.text}</button>
                               );
                             })}
                           </div>
@@ -498,7 +498,7 @@
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,16px))] shadow-[0_-8px_24px_rgba(0,0,0,0.04)] z-20">
             <div className="app-container relative">
               <div className="flex justify-between items-center mb-2 px-1">
-                <span className="text-[9px] font-black text-gray-400 tracking-wider uppercase">加權優劣勢評估</span>
+                <span className="text-xs font-black text-gray-400 tracking-wider uppercase">加權優劣勢評估</span>
                 <div className="flex gap-2">
                   <span className="badge bg-emerald-50 text-emerald-700 border border-emerald-100">Long: {currentEdges.long}</span>
                   <span className="badge bg-rose-50 text-rose-700 border border-rose-100">Short: {currentEdges.short}</span>
@@ -540,8 +540,8 @@
           </header>
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-40">
             <div className="bg-slate-50 p-4 rounded-3xl border border-gray-100 flex justify-between items-center animate-fade-in-up">
-              <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-wide">交易計畫</p><p className="font-extrabold text-xl text-gray-800 mt-0.5">{trade.ticker}</p><p className="text-xs text-gray-500 mt-1">策略: {trade.strategy}</p></div>
-              <div className="text-right"><p className="text-[10px] font-black text-gray-400 uppercase tracking-wide">計畫買入日</p><p className="font-extrabold text-sm text-gray-700 mt-0.5">{formatDateShort(trade.buyDate)}</p></div>
+              <div><p className="text-xs font-black text-gray-400 uppercase tracking-wide">交易計畫</p><p className="font-extrabold text-xl text-gray-800 mt-0.5">{trade.ticker}</p><p className="text-xs text-gray-500 mt-1">策略: {trade.strategy}</p></div>
+              <div className="text-right"><p className="text-xs font-black text-gray-400 uppercase tracking-wide">計畫買入日</p><p className="font-extrabold text-sm text-gray-700 mt-0.5">{formatDateShort(trade.buyDate)}</p></div>
             </div>
             <div className="space-y-4 pt-2">
               <div><label className="text-xs font-bold text-gray-600 mb-1.5 block">實際成交買入價 (可根據手續費或實際價格微調)</label><input type="number" step="0.01" value={actualBuyPrice} onChange={e => setActualBuyPrice(e.target.value)} className="w-full p-3 border rounded-xl text-sm font-bold bg-slate-50" /></div>
@@ -575,22 +575,22 @@
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-20">
             <div className={`p-5 rounded-3xl text-white shadow-xl animate-fade-in-up ${isProfit ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-rose-500 to-red-600'}`}>
               <div className="flex justify-between items-start mb-4">
-                <div><span className="text-[10px] font-black uppercase tracking-widest opacity-80">交易結果</span><h2 className="text-3xl font-black tracking-tight">{trade.ticker}</h2><span className="badge bg-white/20 text-white mt-1 border border-white/10 text-[9px] font-bold">{trade.strategy}</span></div>
-                <div className="text-right"><span className="text-[10px] font-black uppercase tracking-widest opacity-80">回報比率</span><p className="text-3xl font-black tracking-tight mt-0.5">{isProfit ? '+' : ''}{trade.pnlPercent?.toFixed(2)}%</p></div>
+                <div><span className="text-xs font-black uppercase tracking-widest opacity-80">交易結果</span><h2 className="text-3xl font-black tracking-tight">{trade.ticker}</h2><span className="badge bg-white/20 text-white mt-1 border border-white/10 text-xs font-bold">{trade.strategy}</span></div>
+                <div className="text-right"><span className="text-xs font-black uppercase tracking-widest opacity-80">回報比率</span><p className="text-3xl font-black tracking-tight mt-0.5">{isProfit ? '+' : ''}{trade.pnlPercent?.toFixed(2)}%</p></div>
               </div>
               <div className="grid grid-cols-3 gap-2 border-t border-white/20 pt-3.5 mt-2 text-center text-xs">
-                <div><p className="opacity-70 text-[9px] font-bold uppercase mb-0.5">平均買價</p><p className="font-extrabold text-base">${trade.actualBuyPrice?.toFixed(2)}</p></div>
-                <div className="border-l border-r border-white/10"><p className="opacity-70 text-[9px] font-bold uppercase mb-0.5">賣出價格</p><p className="font-extrabold text-base">${trade.sellPrice?.toFixed(2)}</p></div>
-                <div><p className="opacity-70 text-[9px] font-bold uppercase mb-0.5">持倉天數</p><p className="font-extrabold text-base">{trade.holdingDays} 天</p></div>
+                <div><p className="opacity-70 text-xs font-bold uppercase mb-0.5">平均買價</p><p className="font-extrabold text-base">${trade.actualBuyPrice?.toFixed(2)}</p></div>
+                <div className="border-l border-r border-white/10"><p className="opacity-70 text-xs font-bold uppercase mb-0.5">賣出價格</p><p className="font-extrabold text-base">${trade.sellPrice?.toFixed(2)}</p></div>
+                <div><p className="opacity-70 text-xs font-bold uppercase mb-0.5">持倉天數</p><p className="font-extrabold text-base">{trade.holdingDays} 天</p></div>
               </div>
             </div>
             <div className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 space-y-2 animate-fade-in-up">
-              <h3 className="font-extrabold text-[11px] text-gray-400 uppercase tracking-wider">💡 學習筆記 (Lessons Learned)</h3>
+              <h3 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">💡 學習筆記 (Lessons Learned)</h3>
               <p className="text-xs text-gray-700 leading-relaxed font-semibold whitespace-pre-wrap bg-gray-50/50 p-3 rounded-xl border border-gray-100">{trade.reviewNotes || '無任何心得筆記。'}</p>
             </div>
             <div className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 space-y-3 animate-fade-in-up">
               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                <h3 className="font-extrabold text-[11px] text-gray-400 uppercase tracking-wider">📊 當時 M.E.T.S. 評分依據</h3>
+                <h3 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">📊 當時 M.E.T.S. 評分依據</h3>
                 <div className="flex gap-1.5"><span className="badge bg-emerald-50 text-emerald-700 border border-emerald-100">L: {trade.edges?.long}</span><span className="badge bg-rose-50 text-rose-700 border border-rose-100">S: {trade.edges?.short}</span></div>
               </div>
               <div className="space-y-1">
@@ -603,7 +603,7 @@
                   return (
                     <div key={key} className="data-row">
                       <span className="data-label text-gray-500 font-semibold">{label}</span>
-                      <span className={`badge border text-[10px] py-0.5 ${edgeStyle}`}>{option.text}</span>
+                      <span className={`badge border text-xs py-0.5 ${edgeStyle}`}>{option.text}</span>
                     </div>
                   );
                 })}
