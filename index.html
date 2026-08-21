@@ -156,7 +156,11 @@
       const [view, setView] = useState('dashboard');
       const [currentTrade, setCurrentTrade] = useState(null);
       const [pendingImport, setPendingImport] = useState(null);
+      const [portfolioCapital, setPortfolioCapital] = useState(() => parseFloat(localStorage.getItem('mets_portfolio_capital')) || 75000);
+      const [maxExposurePercent, setMaxExposurePercent] = useState(() => parseFloat(localStorage.getItem('mets_max_exposure_percent')) || 6);
       useEffect(() => { localStorage.setItem('mets_trades_v23', JSON.stringify(trades)); }, [trades]);
+      useEffect(() => { localStorage.setItem('mets_portfolio_capital', portfolioCapital.toString()); }, [portfolioCapital]);
+      useEffect(() => { localStorage.setItem('mets_max_exposure_percent', maxExposurePercent.toString()); }, [maxExposurePercent]);
       
       const goTo = (v, t = null) => { setCurrentTrade(t); setView(v); window.scrollTo(0, 0); };
       
@@ -170,8 +174,8 @@
         goTo('dashboard');
       };
       
-      const buyFromWatchlist = (trade, actualBuyPrice) => {
-        setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, status: 'active', buyDate: new Date().toISOString().split('T')[0], actualBuyPrice: actualBuyPrice || t.targetBuyPrice } : t));
+      const buyFromWatchlist = (trade, actualBuyPrice, actualShares) => {
+        setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, status: 'active', buyDate: new Date().toISOString().split('T')[0], actualBuyPrice: actualBuyPrice || t.targetBuyPrice, actualShares } : t));
       };
       const completeTrade = (tid, review) => {
         setTrades(prev => prev.map(t => t.id === tid ? { ...t, ...review, status: 'completed' } : t)); goTo('dashboard');
@@ -216,7 +220,7 @@
 
       return (
         <div className="app-container min-h-screen bg-gray-50 shadow-2xl relative">
-          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onSelect={handleSelectTrade} onDelete={deleteTrade} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} />}
+          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onSelect={handleSelectTrade} onDelete={deleteTrade} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} portfolioCapital={portfolioCapital} maxExposurePercent={maxExposurePercent} onPortfolioCapitalChange={setPortfolioCapital} onMaxExposurePercentChange={setMaxExposurePercent} />}
           {view === 'new_trade' && <NewTradeForm onSave={saveNewTrade} onCancel={() => goTo('dashboard')} editTrade={currentTrade} />}
           {view === 'review_trade' && currentTrade && <ReviewTradeForm trade={currentTrade} onSave={d => completeTrade(currentTrade.id, d)} onCancel={() => goTo('dashboard')} />}
           {view === 'report' && currentTrade && <ReportView trade={currentTrade} onBack={() => goTo('dashboard')} onDelete={() => { deleteTrade(currentTrade.id); goTo('dashboard'); }} />}
@@ -228,7 +232,7 @@
     }
 
     // ---- 儀表板 ----
-    function Dashboard({ trades, onNew, onSelect, onDelete, onBuy, onExport, onImport }) {
+    function Dashboard({ trades, onNew, onSelect, onDelete, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
       const [tab, setTab] = useState('watchlist');
       const watchlist = trades.filter(t => t.status === 'watchlist');
       const active = trades.filter(t => t.status === 'active');
@@ -254,8 +258,39 @@
       const openBuyModal = (t, e) => { e.stopPropagation(); setModal({ isOpen: true, type: 'buy', trade: t }); };
       const closeModal = () => setModal({ isOpen: false });
       
-      const handleBuyConfirm = (price) => {
-        if (modal.trade && price && !isNaN(parseFloat(price)) && parseFloat(price) > 0) { onBuy(modal.trade, parseFloat(price)); }
+      const calculateTotalExposure = (activeList) => {
+        return activeList.reduce((total, trade) => {
+          if (trade.actualBuyPrice && trade.stopLossPrice && trade.actualShares) {
+            const lossPerShare = trade.actualBuyPrice - trade.stopLossPrice;
+            if (lossPerShare > 0) return total + (lossPerShare * trade.actualShares);
+          }
+          return total;
+        }, 0);
+      };
+
+      const currentExposure = calculateTotalExposure(active);
+      const maxExposureAmount = portfolioCapital * (maxExposurePercent / 100);
+
+      const handleBuyConfirm = (price, shares) => {
+        if (modal.trade && price && !isNaN(parseFloat(price)) && parseFloat(price) > 0) {
+          const actualShares = Math.floor(parseFloat(shares)) || modal.trade.maxShares || 0;
+          if (actualShares <= 0) {
+            alert('請輸入有效的實際買入股數。');
+            return;
+          }
+          const newTradeLossPerShare = parseFloat(price) - (modal.trade.stopLossPrice || 0);
+          const newTradeExposure = newTradeLossPerShare > 0 ? newTradeLossPerShare * actualShares : 0;
+          const projectedExposure = currentExposure + newTradeExposure;
+
+          if (projectedExposure > maxExposureAmount && newTradeExposure > 0) {
+            const currentPct = ((currentExposure / portfolioCapital) * 100).toFixed(1);
+            const projectedPct = ((projectedExposure / portfolioCapital) * 100).toFixed(1);
+            setModal({ isOpen: true, type: 'exposureWarning', trade: modal.trade, projectedExposure, currentPct, projectedPct });
+            return;
+          }
+
+          onBuy(modal.trade, parseFloat(price), actualShares);
+        }
         closeModal();
       };
 
@@ -272,6 +307,7 @@
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-black tracking-tight">M.E.T.S. 股票交易檢討</h1>
               <div className="flex gap-2">
+                <button onClick={() => setModal({ isOpen: true, type: 'exposureSettings' })} className="text-white/80 hover:text-white p-1 text-xs font-bold" title="曝險設定">風控</button>
                 <button onClick={onExport} className="text-white/80 hover:text-white p-1 text-xs font-bold" title="匯出備份">匯出</button>
                 <label className="text-white/80 hover:text-white p-1 text-xs font-bold cursor-pointer" title="匯入備份">
                   匯入
@@ -284,6 +320,21 @@
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-xs text-white/80 mt-0.5">勝率</p></div>
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(avgPnL) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{parseFloat(avgPnL) >= 0 ? '+' : ''}{avgPnL}%</p><p className="text-xs text-white/80 mt-0.5">平均盈虧</p></div>
             </div>
+
+            {tab === 'active' && (
+              <div className="mt-5 bg-white/10 rounded-xl p-3 border border-white/10 animate-fade-in-up">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-bold text-white/90">總資金曝險水位</span>
+                  <span className="text-xs font-bold text-white">{((currentExposure / portfolioCapital) * 100).toFixed(1)}% / {maxExposurePercent.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${currentExposure / portfolioCapital > maxExposurePercent / 100 * 0.85 ? 'bg-rose-400' : currentExposure / portfolioCapital > maxExposurePercent / 100 * 0.5 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                    style={{ width: `${Math.min((currentExposure / maxExposureAmount) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
           </header>
           
           <div className="flex bg-white border-b border-gray-100 px-2 sticky top-0 z-10">
@@ -316,7 +367,7 @@
               <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex justify-between items-center animate-fade-in-up cursor-pointer hover:border-purple-200 transition-colors">
                 <div>
                   <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.strategy}</span></div>
-                  <div className="text-xs text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong></div>
+                  <div className="text-xs text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong>{t.actualShares ? ` · ${t.actualShares} 股` : ''}</div>
                   <div className="flex gap-1.5 mt-1.5"><span className="badge bg-emerald-50 text-emerald-700">L: {t.edges?.long??0}</span><span className="badge bg-rose-50 text-rose-700">S: {t.edges?.short??0}</span></div>
                 </div>
                 <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold btn-press">檢討賣出</button>
@@ -344,6 +395,20 @@
             </div>
           </div>
           
+          <Modal isOpen={modal.isOpen && modal.type === 'exposureSettings'} onClose={closeModal} title="投資組合風控設定" actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const capital = parseFloat(document.getElementById('portfolio-capital-input')?.value); const limit = parseFloat(document.getElementById('max-exposure-input')?.value); if (!capital || capital <= 0 || !limit || limit <= 0 || limit > 100) { alert('請輸入有效的總資金與曝險上限（0 至 100%）。'); return; } onPortfolioCapitalChange(capital); onMaxExposurePercentChange(limit); closeModal(); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">儲存設定</button></>}>
+            <div className="space-y-3">
+              <p className="text-gray-600">系統會以所有持有中交易同時觸及止損價時的預估虧損，限制整體投資組合風險。</p>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">投資組合總資金</label><input id="portfolio-capital-input" type="number" inputmode="decimal" defaultValue={portfolioCapital} className="w-full p-3 border rounded-xl text-sm font-bold text-gray-800" /></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">最大總曝險上限 (%)</label><input id="max-exposure-input" type="number" inputmode="decimal" step="0.1" defaultValue={maxExposurePercent} className="w-full p-3 border rounded-xl text-sm font-bold text-gray-800" /></div>
+              <p className="text-xs text-indigo-700 bg-indigo-50 rounded-xl p-2.5 font-bold">目前最高容許潛在虧損：${maxExposureAmount.toFixed(2)}</p>
+            </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'exposureWarning'} onClose={closeModal} title="⚠️ 總曝險過高" actions={<><button onClick={() => setModal({ isOpen: true, type: 'buy', trade: modal.trade })} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">返回調整買入股數</button></>}>
+            <div className="space-y-2 text-gray-700">
+              <p>這次買入後，投資組合的預估最大虧損將從 <strong>{modal.currentPct}%</strong> 上升至 <strong className="text-rose-600">{modal.projectedPct}%</strong>，超過您設定的 <strong>{maxExposurePercent.toFixed(1)}%</strong> 上限。</p>
+              <p className="text-xs text-gray-500">建議減少股數、調整止損，或先降低既有持倉。</p>
+            </div>
+          </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'cooldown'} onClose={closeModal} title="⏸️ 冷靜期提示" actions={<><button onClick={() => { closeModal(); onNew(); }} className="px-4 py-2 text-xs text-gray-400 font-medium underline">我已冷靜，繼續新增</button><button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">好的，我休息一下</button></>}>
             <div className="space-y-2 text-gray-700">
               <p>系統偵測到您在過去 24 小時內已記錄了 <strong>3 筆以上的虧損交易</strong>。</p>
@@ -351,8 +416,20 @@
             </div>
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'delete'} onClose={closeModal} title="確認刪除項目" actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { onDelete(modal.trade.id); closeModal(); }} className="px-4 py-2 bg-rose-500 text-white rounded-xl font-bold text-xs">確定刪除</button></>}>確定要將 {modal.trade?.ticker} 從清單中完全移除嗎？</Modal>
-          <Modal isOpen={modal.isOpen && modal.type === 'buy'} onClose={closeModal} title={`買入紀錄：${modal.trade?.ticker}`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const input = document.getElementById('buy-price-input'); if (input) handleBuyConfirm(input.value); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認交易</button></>}>
-            <div className="space-y-3 pt-1"><p className="text-xs font-semibold text-gray-500">計畫進場價: <strong className="text-gray-800">${modal.trade?.targetBuyPrice?.toFixed(2)}</strong></p><label className="block text-xs font-bold text-gray-700">請輸入實際買入成交價：</label><input id="buy-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.targetBuyPrice?.toFixed(2)} className="w-full p-3 border-2 border-indigo-100 rounded-xl text-lg font-bold text-indigo-700 text-center outline-none focus:border-indigo-500" placeholder="0.00" autoFocus /></div>
+          <Modal isOpen={modal.isOpen && modal.type === 'buy'} onClose={closeModal} title={`買入紀錄：${modal.trade?.ticker}`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const pInput = document.getElementById('buy-price-input'); const sInput = document.getElementById('buy-shares-input'); if (pInput) handleBuyConfirm(pInput.value, sInput?.value); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認交易</button></>}>
+            <div className="space-y-3 pt-1">
+              <p className="text-xs font-semibold text-gray-500">計畫進場價: <strong className="text-gray-800">${modal.trade?.targetBuyPrice?.toFixed(2)}</strong></p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">實際買入成交價：</label>
+                  <input id="buy-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.targetBuyPrice?.toFixed(2)} className="w-full p-2.5 border-2 border-indigo-100 rounded-xl text-base font-bold text-indigo-700 text-center outline-none focus:border-indigo-500" placeholder="0.00" autoFocus />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">實際買入股數：</label>
+                  <input id="buy-shares-input" type="number" inputmode="numeric" defaultValue={modal.trade?.maxShares || ''} className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-base font-bold text-gray-700 text-center outline-none focus:border-gray-400" placeholder="股數" />
+                </div>
+              </div>
+            </div>
           </Modal>
         </div>
       );
