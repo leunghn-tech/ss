@@ -155,6 +155,7 @@
       const [trades, setTrades] = useState(() => { try { return JSON.parse(localStorage.getItem('mets_trades_v23')) || []; } catch { return []; } });
       const [view, setView] = useState('dashboard');
       const [currentTrade, setCurrentTrade] = useState(null);
+      const [pendingImport, setPendingImport] = useState(null);
       useEffect(() => { localStorage.setItem('mets_trades_v23', JSON.stringify(trades)); }, [trades]);
       
       const goTo = (v, t = null) => { setCurrentTrade(t); setView(v); window.scrollTo(0, 0); };
@@ -183,18 +184,51 @@
         else if (trade.status === 'completed') { goTo('report', trade); }
       };
 
+      const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trades, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `mets_backup_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      };
+
+      const handleImport = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const importedTrades = JSON.parse(event.target.result);
+            if (Array.isArray(importedTrades)) {
+              setPendingImport(importedTrades);
+            } else {
+              alert('匯入失敗：檔案格式不正確');
+            }
+          } catch (err) {
+            alert('匯入失敗：無效的 JSON 檔案');
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input
+      };
+
       return (
         <div className="app-container min-h-screen bg-gray-50 shadow-2xl relative">
-          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onSelect={handleSelectTrade} onDelete={deleteTrade} onBuy={buyFromWatchlist} />}
+          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onSelect={handleSelectTrade} onDelete={deleteTrade} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} />}
           {view === 'new_trade' && <NewTradeForm onSave={saveNewTrade} onCancel={() => goTo('dashboard')} editTrade={currentTrade} />}
           {view === 'review_trade' && currentTrade && <ReviewTradeForm trade={currentTrade} onSave={d => completeTrade(currentTrade.id, d)} onCancel={() => goTo('dashboard')} />}
           {view === 'report' && currentTrade && <ReportView trade={currentTrade} onBack={() => goTo('dashboard')} onDelete={() => { deleteTrade(currentTrade.id); goTo('dashboard'); }} />}
+          <Modal isOpen={Array.isArray(pendingImport)} onClose={() => setPendingImport(null)} title="確認匯入備份" actions={<><button onClick={() => setPendingImport(null)} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { setTrades(pendingImport); setPendingImport(null); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認取代資料</button></>}>
+            此備份包含 <strong>{pendingImport?.length || 0}</strong> 筆紀錄。匯入後會完全取代目前的 <strong>{trades.length}</strong> 筆紀錄，且此操作無法復原。建議先匯出目前資料。
+          </Modal>
         </div>
       );
     }
 
     // ---- 儀表板 ----
-    function Dashboard({ trades, onNew, onSelect, onDelete, onBuy }) {
+    function Dashboard({ trades, onNew, onSelect, onDelete, onBuy, onExport, onImport }) {
       const [tab, setTab] = useState('watchlist');
       const watchlist = trades.filter(t => t.status === 'watchlist');
       const active = trades.filter(t => t.status === 'active');
@@ -223,7 +257,16 @@
       return (
         <div className="flex flex-col min-h-screen">
           <header className="bg-gradient-to-r from-purple-700 to-indigo-600 text-white px-5 pt-6 pb-6 rounded-b-[2.5rem] shadow-lg safe-bottom">
-            <h1 className="text-2xl font-black tracking-tight">M.E.T.S. 股票交易檢討</h1>
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-black tracking-tight">M.E.T.S. 股票交易檢討</h1>
+              <div className="flex gap-2">
+                <button onClick={onExport} className="text-white/80 hover:text-white p-1 text-xs font-bold" title="匯出備份">匯出</button>
+                <label className="text-white/80 hover:text-white p-1 text-xs font-bold cursor-pointer" title="匯入備份">
+                  匯入
+                  <input type="file" accept=".json" onChange={onImport} className="hidden" />
+                </label>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-3 mt-4">
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className="text-xl font-extrabold">{totalComp}</p><p className="text-xs text-white/80 mt-0.5">總交易</p></div>
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-xs text-white/80 mt-0.5">勝率</p></div>
