@@ -236,7 +236,7 @@
 
       return (
         <div className="app-container min-h-screen bg-gray-50 shadow-2xl relative">
-          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onEdit={t => goTo('new_trade', t)} onCompleteEdit={t => goTo('review_trade', t)} onSelect={handleSelectTrade} onDelete={deleteTrade} onUpdatePrice={updateActivePrice} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} portfolioCapital={portfolioCapital} maxExposurePercent={maxExposurePercent} onPortfolioCapitalChange={setPortfolioCapital} onMaxExposurePercentChange={setMaxExposurePercent} />}
+          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onEdit={t => goTo('new_trade', t)} onCompleteEdit={t => goTo('review_trade', t)} onBatchUpdate={updates => setTrades(prev => prev.map(t => updates[t.id] ? { ...t, ...updates[t.id] } : t))} onSelect={handleSelectTrade} onDelete={deleteTrade} onUpdatePrice={updateActivePrice} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} portfolioCapital={portfolioCapital} maxExposurePercent={maxExposurePercent} onPortfolioCapitalChange={setPortfolioCapital} onMaxExposurePercentChange={setMaxExposurePercent} />}
           {view === 'new_trade' && <NewTradeForm onSave={saveNewTrade} onCancel={() => goTo('dashboard')} editTrade={currentTrade} />}
           {view === 'review_trade' && currentTrade && <ReviewTradeForm trade={currentTrade} onSave={d => completeTrade(currentTrade.id, d)} onCancel={() => goTo('dashboard')} />}
           {view === 'report' && currentTrade && <ReportView trade={currentTrade} onBack={() => goTo('dashboard')} onDelete={() => { deleteTrade(currentTrade.id); goTo('dashboard'); }} />}
@@ -248,7 +248,7 @@
     }
 
     // ---- 儀表板 ----
-    function Dashboard({ trades, onNew, onEdit, onCompleteEdit, onSelect, onDelete, onUpdatePrice, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
+    function Dashboard({ trades, onNew, onEdit, onCompleteEdit, onBatchUpdate, onSelect, onDelete, onUpdatePrice, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
       const [tab, setTab] = useState('watchlist');
       const [filterStrategy, setFilterStrategy] = useState('ALL');
       const [filterCompleteOnly, setFilterCompleteOnly] = useState(false);
@@ -335,6 +335,8 @@
       const avgLossDays = losers.length > 0 ? (losers.reduce((s, t) => s + (t.holdingDays || 0), 0) / losers.length).toFixed(1) : '--';
 
       const [modal, setModal] = useState({ isOpen: false, type: null, trade: null });
+      const [selectedIncompleteIds, setSelectedIncompleteIds] = useState([]);
+      const [batchCompletionFields, setBatchCompletionFields] = useState({ sellDate: '', sellPrice: '', reviewNote: '' });
 
       const isWeekend = () => {
         const day = new Date().getDay();
@@ -362,6 +364,62 @@
       const openBuyModal = (t, e) => { e.stopPropagation(); setModal({ isOpen: true, type: 'buy', trade: t }); };
       const openPriceModal = (t, e) => { e.stopPropagation(); setModal({ isOpen: true, type: 'priceUpdate', trade: t }); };
       const closeModal = () => setModal({ isOpen: false });
+      const toggleIncompleteSelection = (id) => setSelectedIncompleteIds(prev => prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]);
+      const toggleSelectAllIncomplete = () => setSelectedIncompleteIds(prev => prev.length === incompleteTrades.length ? [] : incompleteTrades.map(t => t.id));
+      const exportIncompleteTradesCsv = () => {
+        const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const header = ['交易代號', '策略', '計畫買入日期', '實際買入價', '賣出日期', '持有天數', '賣出成交價', '盈虧%', '檢討筆記', '缺漏欄位'];
+        const rows = incompleteTrades.map(t => [
+          t.ticker,
+          t.strategy,
+          t.buyDate,
+          t.actualBuyPrice ?? t.targetBuyPrice,
+          t.sellDate,
+          t.holdingDays,
+          t.sellPrice,
+          t.pnlPercent,
+          t.reviewNotes,
+          getMissingCompletionFields(t).join('、')
+        ]);
+        const csvContent = `\uFEFF${[header, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n')}`;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `mets_incomplete_trades_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      };
+      const applyBatchCompletion = () => {
+        if (selectedIncompleteIds.length === 0) { alert('請先選取至少一筆未完成交易。'); return; }
+        const sellDate = batchCompletionFields.sellDate;
+        const sellPriceText = batchCompletionFields.sellPrice.trim();
+        const reviewNote = batchCompletionFields.reviewNote.trim();
+        if (!sellDate && !sellPriceText && !reviewNote) { alert('請至少填寫一項批次修改內容。'); return; }
+        const sellPrice = sellPriceText ? parseFloat(sellPriceText) : null;
+        if (sellPriceText && (!Number.isFinite(sellPrice) || sellPrice <= 0)) { alert('請輸入有效的批次賣出成交價。'); return; }
+        const updates = {};
+        incompleteTrades.filter(t => selectedIncompleteIds.includes(t.id)).forEach(t => {
+          const update = {};
+          if (sellDate) {
+            update.sellDate = sellDate;
+            if (t.buyDate) update.holdingDays = calcHoldingDays(t.buyDate, sellDate);
+          }
+          if (sellPrice !== null) {
+            update.sellPrice = sellPrice;
+            const buyPrice = Number(t.actualBuyPrice || t.targetBuyPrice);
+            if (Number.isFinite(buyPrice) && buyPrice > 0) update.pnlPercent = calcPnL(buyPrice, sellPrice);
+          }
+          if (reviewNote) update.reviewNotes = t.reviewNotes ? `${t.reviewNotes.trim()}\n${reviewNote}` : reviewNote;
+          updates[t.id] = update;
+        });
+        onBatchUpdate(updates);
+        setSelectedIncompleteIds([]);
+        setBatchCompletionFields({ sellDate: '', sellPrice: '', reviewNote: '' });
+        setModal({ isOpen: true, type: 'batchCompletionSuccess', count: Object.keys(updates).length });
+      };
       const savePriceUpdate = () => {
         const currentPrice = parseFloat(document.getElementById('current-price-input')?.value);
         const highPrice = parseFloat(document.getElementById('high-price-input')?.value);
@@ -593,30 +651,53 @@
             <div className="space-y-3"><p>記錄目前市價及進場以來的最高價格，系統將檢查是否有獲利回吐的情況。</p><div><label className="block text-xs font-bold text-gray-700 mb-1">目前市價</label><input id="current-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.currentPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">進場後最高價</label><input id="high-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.highPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div></div>
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'dataCompletion'} onClose={closeModal} title="資料補齊中心" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
-            <div className="space-y-3">
-              <p className="text-xs text-gray-500">集中處理已完成交易中缺少的賣出日期、持有天數、賣出成交價或檢討筆記。補齊後，統計與分析才會納入完整資料。</p>
+            <div className="max-h-[62vh] space-y-3 overflow-y-auto pr-1">
+              <p className="text-xs text-gray-500">集中處理已完成交易中缺少的賣出日期、持有天數、賣出成交價或檢討筆記。批次套用的賣出日期會同步重算持有天數；批次筆記則會附加至既有內容。</p>
               {incompleteTrades.length === 0 ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center text-emerald-700">
                   <p className="font-bold">✓ 所有已完成交易資料完整</p>
                   <p className="mt-1 text-[11px] text-emerald-600">目前沒有需要補齊的結案交易。</p>
                 </div>
               ) : (
-                <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-                  {incompleteTrades.map(t => {
-                    const missing = getMissingCompletionFields(t);
-                    return (
-                      <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/60 p-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-800">{t.ticker} <span className="ml-1 text-[10px] font-medium text-gray-400">{t.strategy || '未設定策略'}</span></p>
-                          <p className="mt-1 text-[11px] font-medium leading-relaxed text-amber-800">待補：{missing.join('、')}</p>
-                        </div>
-                        <button onClick={() => { closeModal(); onCompleteEdit(t); }} className="inline-flex min-h-[44px] shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm btn-press">前往補齊</button>
+                <>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                    <button onClick={toggleSelectAllIncomplete} className="min-h-[40px] rounded-lg px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">{selectedIncompleteIds.length === incompleteTrades.length ? '取消全選' : '全選未完成交易'}</button>
+                    <button onClick={exportIncompleteTradesCsv} className="min-h-[40px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 hover:bg-slate-100">匯出未完成 CSV</button>
+                    <span className="col-span-2 text-center text-xs font-bold text-gray-500">已選 {selectedIncompleteIds.length} / {incompleteTrades.length} 筆</span>
+                  </div>
+                  {selectedIncompleteIds.length > 0 && (
+                    <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+                      <p className="text-xs font-bold text-indigo-800">批次修改已選交易</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><label className="mb-1 block text-[10px] font-bold text-indigo-700">賣出日期</label><input type="date" value={batchCompletionFields.sellDate} onChange={e => setBatchCompletionFields(prev => ({ ...prev, sellDate: e.target.value }))} className="w-full min-h-[40px] rounded-lg border border-indigo-100 bg-white px-2 text-xs font-bold text-gray-700" /></div>
+                        <div><label className="mb-1 block text-[10px] font-bold text-indigo-700">賣出成交價</label><input type="number" inputmode="decimal" step="0.01" value={batchCompletionFields.sellPrice} onChange={e => setBatchCompletionFields(prev => ({ ...prev, sellPrice: e.target.value }))} className="w-full min-h-[40px] rounded-lg border border-indigo-100 bg-white px-2 text-xs font-bold text-gray-700" placeholder="留白則不修改" /></div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div><label className="mb-1 block text-[10px] font-bold text-indigo-700">附加至檢討筆記</label><textarea rows="2" value={batchCompletionFields.reviewNote} onChange={e => setBatchCompletionFields(prev => ({ ...prev, reviewNote: e.target.value }))} className="w-full rounded-lg border border-indigo-100 bg-white p-2 text-xs text-gray-700" placeholder="留白則不修改既有筆記" /></div>
+                      <button onClick={applyBatchCompletion} className="min-h-[44px] w-full rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm btn-press">套用至 {selectedIncompleteIds.length} 筆交易</button>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {incompleteTrades.map(t => {
+                      const missing = getMissingCompletionFields(t);
+                      const isSelected = selectedIncompleteIds.includes(t.id);
+                      return (
+                        <div key={t.id} className={`flex items-center gap-2 rounded-xl border p-3 transition-colors ${isSelected ? 'border-indigo-200 bg-indigo-50/60' : 'border-amber-100 bg-amber-50/60'}`}>
+                          <label className="inline-flex min-h-[44px] min-w-[32px] cursor-pointer items-center justify-center" aria-label={`選取 ${t.ticker}`}><input type="checkbox" checked={isSelected} onChange={() => toggleIncompleteSelection(t.id)} className="h-4 w-4 accent-indigo-600" /></label>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-gray-800">{t.ticker} <span className="ml-1 text-[10px] font-medium text-gray-400">{t.strategy || '未設定策略'}</span></p>
+                            <p className="mt-1 text-[11px] font-medium leading-relaxed text-amber-800">待補：{missing.join('、')}</p>
+                          </div>
+                          <button onClick={() => { closeModal(); onCompleteEdit(t); }} className="inline-flex min-h-[44px] shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm btn-press">前往補齊</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'batchCompletionSuccess'} onClose={closeModal} title="批次修改已完成" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">繼續補齊</button>}>
+            <p>已套用修改到 <strong>{modal.count || 0}</strong> 筆交易。系統已依照填入的賣出日期更新持有天數，並重新計算有填入賣出成交價的盈虧。</p>
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'strategyMatrix'} onClose={closeModal} title="策略與型態勝率矩陣" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
             <div className="space-y-4">
