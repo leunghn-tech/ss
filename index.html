@@ -145,6 +145,7 @@
       TrendingUp: ({size=24}={})=><svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 18 8.5 10.5 13.5 15.5 23 6"/><polyline points="17 6 23 6 23 12"/></svg>,
       Trash: ({size=16}={})=><svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2 2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a2 2 0 0 1 1 1v2"/></svg>,
       EmptyFolder: ({size=40}={})=><svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+      BarChart: ({size=24}={})=><svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
     };
 
     // ---- Modal 組件 ----
@@ -358,6 +359,12 @@
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-xs text-white/80 mt-0.5">勝率</p></div>
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(avgPnL) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{parseFloat(avgPnL) >= 0 ? '+' : ''}{avgPnL}%</p><p className="text-xs text-white/80 mt-0.5">平均盈虧</p></div>
             </div>
+            {tab === 'history' && completed.length > 0 && (
+              <div className="mt-4 flex gap-2 overflow-x-auto hide-scrollbar">
+                <button onClick={() => setModal({ isOpen: true, type: 'strategyMatrix' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 策略與型態勝率</button>
+                <button onClick={() => setModal({ isOpen: true, type: 'edgeCorrelation' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 優勢分數與盈虧</button>
+              </div>
+            )}
 
               {tab === 'active' && (
                 <div className="mt-5 max-w-3xl bg-white/10 rounded-xl p-3 border border-white/10 animate-fade-in-up">
@@ -480,6 +487,82 @@
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'priceUpdate'} onClose={closeModal} title={`更新 ${modal.trade?.ticker} 價格`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={savePriceUpdate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">儲存並檢查</button></>}>
             <div className="space-y-3"><p>記錄目前市價及進場以來的最高價格，系統將檢查是否有獲利回吐的情況。</p><div><label className="block text-xs font-bold text-gray-700 mb-1">目前市價</label><input id="current-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.currentPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">進場後最高價</label><input id="high-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.highPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div></div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'strategyMatrix'} onClose={closeModal} title="策略與型態勝率矩陣" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500">分析不同策略與圖表型態的勝率，找出您的最佳獲利模式。</p>
+              <p className="text-[11px] font-bold text-indigo-500 md:hidden">← 左右滑動查看完整矩陣 →</p>
+              <div className="overflow-x-auto hide-scrollbar border border-gray-100 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
+                      <th className="p-3 font-bold">策略 \ 型態</th>
+                      {Array.from(new Set(completed.map(t => t.answers?.s_pattern?.text).filter(Boolean))).map(p => <th key={p} className="p-3 font-bold whitespace-nowrap">{p}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from(new Set(completed.map(t => t.strategy).filter(Boolean))).map(s => (
+                      <tr key={s} className="border-b border-gray-50 last:border-0">
+                        <td className="p-3 font-bold text-gray-700 whitespace-nowrap">{s}</td>
+                        {Array.from(new Set(completed.map(t => t.answers?.s_pattern?.text).filter(Boolean))).map(p => {
+                          const subset = completed.filter(t => t.strategy === s && t.answers?.s_pattern?.text === p);
+                          if (subset.length === 0) return <td key={p} className="p-3 text-gray-300 text-center">-</td>;
+                          const wins = subset.filter(t => t.pnlPercent > 0).length;
+                          const winPct = (wins / subset.length) * 100;
+                          return (
+                            <td key={p} className="p-3 text-center whitespace-nowrap">
+                              <span className={`font-bold ${winPct >= 50 ? 'text-emerald-600' : 'text-rose-500'}`}>{winPct.toFixed(0)}%</span>
+                              <span className="text-[10px] text-gray-400 block mt-0.5">({wins}/{subset.length})</span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'edgeCorrelation'} onClose={closeModal} title="優勢分數與實際盈虧" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500">驗證您的 M.E.T.S. 評分是否有效。淨優勢分數 = Long 數量 - Short 數量。</p>
+              <div className="h-64 relative border-l border-b border-gray-200 ml-4 mb-6 mt-4">
+                {/* Y-axis labels (PnL%) */}
+                <div className="absolute -left-10 top-0 text-[10px] text-gray-400">+20%</div>
+                <div className="absolute -left-10 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">0%</div>
+                <div className="absolute -left-10 bottom-0 text-[10px] text-gray-400">-20%</div>
+
+                {/* X-axis labels (Net Edge Score) */}
+                <div className="absolute -bottom-6 left-0 text-[10px] text-gray-400">-10</div>
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-gray-400">0</div>
+                <div className="absolute -bottom-6 right-0 text-[10px] text-gray-400">+10</div>
+
+                {/* Zero lines */}
+                <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-gray-200"></div>
+                <div className="absolute top-0 bottom-0 left-1/2 border-l border-dashed border-gray-200"></div>
+
+                {/* Data points */}
+                {completed.map(t => {
+                  const netEdge = (t.edges?.long || 0) - (t.edges?.short || 0);
+                  const pnl = t.pnlPercent || 0;
+
+                  // Map netEdge (-10 to +10) to x (0% to 100%)
+                  const x = Math.max(0, Math.min(100, ((netEdge + 10) / 20) * 100));
+
+                  // Map PnL (-20% to +20%) to y (100% to 0%)
+                  const y = Math.max(0, Math.min(100, 100 - ((pnl + 20) / 40) * 100));
+
+                  return (
+                    <div
+                      key={t.id}
+                      className={`absolute w-3 h-3 rounded-full -ml-1.5 -mt-1.5 opacity-70 ${pnl >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                      style={{ left: `${x}%`, top: `${y}%` }}
+                      title={`${t.ticker}: 淨優勢 ${netEdge}, 盈虧 ${pnl.toFixed(1)}%`}
+                    ></div>
+                  );
+                })}
+              </div>
+            </div>
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'delete'} onClose={closeModal} title="確認刪除項目" actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { onDelete(modal.trade.id); closeModal(); }} className="px-4 py-2 bg-rose-500 text-white rounded-xl font-bold text-xs">確定刪除</button></>}>確定要將 {modal.trade?.ticker} 從清單中完全移除嗎？</Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'buy'} onClose={closeModal} title={`買入紀錄：${modal.trade?.ticker}`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={() => { const pInput = document.getElementById('buy-price-input'); const sInput = document.getElementById('buy-shares-input'); if (pInput) handleBuyConfirm(pInput.value, sInput?.value); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">確認交易</button></>}>
