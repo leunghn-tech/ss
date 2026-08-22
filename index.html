@@ -341,13 +341,13 @@
         <div className="dashboard-page flex flex-col min-h-screen">
           <header className="dashboard-hero text-white px-5 pt-6 pb-6 rounded-b-[2.5rem] shadow-lg safe-bottom md:rounded-none md:px-0">
             <div className="desktop-shell">
-              <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-black tracking-tight">M.E.T.S. 股票交易檢討</h1>
-              <div className="flex items-center gap-2">
+              <div className="flex justify-between items-start gap-3">
+              <h1 className="text-xl leading-tight font-black tracking-tight md:text-2xl">M.E.T.S. 股票交易檢討</h1>
+              <div className="flex items-center gap-1 shrink-0">
                 <button onClick={handleNewTradeClick} className="hidden md:inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-black text-violet-700 shadow-sm hover:bg-violet-50"><Icons.Plus size={15} /> 新增交易</button>
-                <button onClick={() => setModal({ isOpen: true, type: 'exposureSettings' })} className="text-white/80 hover:text-white p-1 text-xs font-bold" title="曝險設定">風控</button>
-                <button onClick={onExport} className="text-white/80 hover:text-white p-1 text-xs font-bold" title="匯出備份">匯出</button>
-                <label className="text-white/80 hover:text-white p-1 text-xs font-bold cursor-pointer" title="匯入備份">
+                <button onClick={() => setModal({ isOpen: true, type: 'exposureSettings' })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white text-xs font-bold" title="曝險設定">風控</button>
+                <button onClick={onExport} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white text-xs font-bold" title="匯出備份">匯出</button>
+                <label className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white text-xs font-bold cursor-pointer" title="匯入備份">
                   匯入
                   <input type="file" accept=".json" onChange={onImport} className="hidden" />
                 </label>
@@ -378,7 +378,7 @@
           
           <div className="flex bg-white/95 border-b border-slate-200 px-2 sticky top-0 z-10 md:px-8 md:shadow-sm">
             {[{ key: 'watchlist', label: '📋 觀察名單', count: watchlist.length }, { key: 'active', label: '📈 持有中', count: active.length }, { key: 'history', label: '📊 歷史報告', count: completed.length }].map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)} className={`flex-1 py-3 text-xs font-bold text-center transition-colors ${tab === t.key ? 'tab-active' : 'tab-inactive hover:text-gray-600'}`}>{t.label} ({t.count})</button>
+              <button key={t.key} onClick={() => setTab(t.key)} className={`flex-1 min-h-[48px] py-3 text-xs font-bold text-center transition-colors ${tab === t.key ? 'tab-active' : 'tab-inactive hover:text-gray-600'}`}>{t.label} ({t.count})</button>
             ))}
           </div>
           
@@ -388,8 +388,8 @@
                 <div className="flex justify-between items-start mb-2">
                   <div><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className="badge bg-indigo-50 text-indigo-700 ml-2 border border-indigo-100">{t.strategy}</span></div>
                   <div className="flex gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(t); }} className="text-gray-400 hover:text-indigo-600 p-1.5 rounded hover:bg-indigo-50 text-xs font-bold transition-colors">編輯</button>
-                    <button onClick={(e) => openDeleteModal(t, e)} className="text-gray-400 hover:text-rose-500 p-1.5 rounded hover:bg-rose-50 transition-colors"><Icons.Trash size={16}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(t); }} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-500 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 text-xs font-bold transition-colors">編輯</button>
+                    <button onClick={(e) => openDeleteModal(t, e)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 transition-colors" aria-label={`刪除 ${t.ticker}`}><Icons.Trash size={18}/></button>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-3 md:gap-3">
@@ -403,12 +403,12 @@
                     <span className="badge bg-rose-50 text-rose-700 border border-rose-100">S: {t.edges?.short??0}</span>
                     {t.maxShares && <span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.maxShares}股</span>}
                   </div>
-                  <button onClick={(e) => openBuyModal(t, e)} className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold btn-press shadow-sm">確認買入</button>
+                  <button onClick={(e) => openBuyModal(t, e)} className="min-h-[44px] bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold btn-press shadow-sm">確認買入</button>
                 </div>
               </div>
             )))}
             {tab === 'active' && (active.length === 0 ? renderEmptyState('暫無持有項目') : active.map(t => (
-              <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex justify-between items-center animate-fade-in-up cursor-pointer hover:border-purple-200 transition-colors">
+              <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex flex-col items-stretch gap-4 animate-fade-in-up cursor-pointer hover:border-purple-200 transition-colors sm:flex-row sm:justify-between sm:items-center">
                 <div className="flex-1">
                   <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{t.strategy}</span></div>
                   <div className="text-xs text-gray-400 font-semibold mt-1">📅 {formatDateShort(t.buyDate)} 成本: <strong className="text-gray-700">${t.actualBuyPrice?.toFixed(2) || t.targetBuyPrice?.toFixed(2)}</strong>{t.actualShares ? ` · ${t.actualShares} 股` : ''}</div>
@@ -424,9 +424,9 @@
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 shrink-0 ml-4">
-                  <button onClick={(e) => openPriceModal(t, e)} className="border border-indigo-200 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold btn-press bg-white hover:bg-indigo-50">更新市價</button>
-                  <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold btn-press">檢討賣出</button>
+                <div className="grid w-full grid-cols-2 gap-2 shrink-0 sm:flex sm:w-auto sm:flex-col sm:ml-4">
+                  <button onClick={(e) => openPriceModal(t, e)} className="min-h-[44px] border border-indigo-200 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold btn-press bg-white hover:bg-indigo-50">更新市價</button>
+                  <button className="min-h-[44px] bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold btn-press">檢討賣出</button>
                 </div>
               </div>
             )))}
@@ -614,7 +614,7 @@
         <div className="flex flex-col min-h-screen bg-slate-50">
           <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
             <div className="desktop-shell flex min-h-[64px] items-center">
-              <button onClick={onCancel} className="p-2 -ml-2 text-gray-500 rounded-full hover:bg-gray-100"><Icons.ArrowLeft size={22} /></button>
+              <button onClick={onCancel} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -ml-2 text-gray-500 rounded-full hover:bg-gray-100" aria-label="返回"><Icons.ArrowLeft size={22} /></button>
               <div className="flex-1 text-center">
                 <p className="hidden md:block text-xs font-black uppercase tracking-[0.18em] text-indigo-500">Trade plan</p>
                 <h1 className="text-base font-extrabold tracking-tight text-gray-800">{editTrade ? `修改 ${editTrade.ticker} 交易計畫` : '建立 M.E.T.S 交易計畫'}</h1>
@@ -710,7 +710,7 @@
                             {item.options.map((opt, oIdx) => {
                               const isSel = selected?.text === opt.text;
                               return (
-                                <button key={oIdx} onClick={() => handleOptionSelect(item.id, opt)} className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all btn-press ${isSel ? 'chip-active' : 'chip-inactive'}`}>{opt.text}</button>
+                                <button key={oIdx} onClick={() => handleOptionSelect(item.id, opt)} className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-bold leading-tight transition-all btn-press ${isSel ? 'chip-active' : 'chip-inactive'}`}>{opt.text}</button>
                               );
                             })}
                           </div>
@@ -799,7 +799,7 @@
       return (
         <div className="flex flex-col min-h-screen bg-white">
           <header className="flex items-center px-3 py-2.5 border-b bg-white sticky top-0 z-10">
-            <button onClick={onCancel} className="p-1.5 -ml-1.5 text-gray-500 rounded-full hover:bg-gray-100"><Icons.ArrowLeft size={22} /></button>
+            <button onClick={onCancel} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -ml-2 text-gray-500 rounded-full hover:bg-gray-100" aria-label="返回"><Icons.ArrowLeft size={22} /></button>
             <h1 className="text-base font-extrabold flex-1 text-center pr-8 text-gray-800">完成交易與檢討 ({trade.ticker})</h1>
           </header>
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-40">
@@ -833,7 +833,7 @@
       return (
         <div className="flex flex-col min-h-screen bg-slate-50">
           <header className="flex items-center justify-between px-3 py-2.5 border-b bg-white sticky top-0 z-10">
-            <button onClick={onBack} className="p-1.5 -ml-1.5 text-gray-500 rounded-full hover:bg-gray-100"><Icons.ArrowLeft size={22} /></button>
+            <button onClick={onBack} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -ml-2 text-gray-500 rounded-full hover:bg-gray-100" aria-label="返回"><Icons.ArrowLeft size={22} /></button>
             <h1 className="text-base font-extrabold text-gray-800">交易檢討報告 ({trade.ticker})</h1>
             <button onClick={onDelete} className="p-1.5 -mr-1.5 text-gray-300 hover:text-rose-500 transition-colors"><Icons.Trash size={16} /></button>
           </header>
