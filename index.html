@@ -250,12 +250,36 @@
     // ---- 儀表板 ----
     function Dashboard({ trades, onNew, onEdit, onSelect, onDelete, onUpdatePrice, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
       const [tab, setTab] = useState('watchlist');
+      const [filterStrategy, setFilterStrategy] = useState('ALL');
+      const [filterCompleteOnly, setFilterCompleteOnly] = useState(false);
+
       const watchlist = trades.filter(t => t.status === 'watchlist');
       const active = trades.filter(t => t.status === 'active');
-      const completed = trades.filter(t => t.status === 'completed');
+
+      const isTradeComplete = (t) => {
+        return t.strategy && t.answers?.s_pattern?.text && t.buyDate && t.sellDate && t.actualBuyPrice && t.sellPrice && t.reviewNotes && t.reviewNotes.length >= 10;
+      };
+
+      let completed = trades.filter(t => t.status === 'completed');
+      if (filterCompleteOnly) {
+        completed = completed.filter(isTradeComplete);
+      }
+      if (filterStrategy !== 'ALL') {
+        completed = completed.filter(t => t.strategy === filterStrategy);
+      }
+
+      const availableStrategies = Array.from(new Set(trades.filter(t => t.status === 'completed').map(t => t.strategy).filter(Boolean)));
+
       const totalComp = completed.length;
       const winRate = totalComp > 0 ? ((completed.filter(t => t.pnlPercent > 0).length / totalComp) * 100).toFixed(1) : '--';
       const avgPnL = totalComp > 0 ? (completed.reduce((s, t) => s + (t.pnlPercent || 0), 0) / totalComp).toFixed(2) : '--';
+
+      // Holding Period & Exit Quality Analysis
+      const winners = completed.filter(t => t.pnlPercent > 0);
+      const losers = completed.filter(t => t.pnlPercent <= 0);
+      const avgWinDays = winners.length > 0 ? (winners.reduce((s, t) => s + (t.holdingDays || 0), 0) / winners.length).toFixed(1) : '--';
+      const avgLossDays = losers.length > 0 ? (losers.reduce((s, t) => s + (t.holdingDays || 0), 0) / losers.length).toFixed(1) : '--';
+
       const [modal, setModal] = useState({ isOpen: false, type: null, trade: null });
 
       const isWeekend = () => {
@@ -363,6 +387,8 @@
               <div className="mt-4 flex gap-2 overflow-x-auto hide-scrollbar">
                 <button onClick={() => setModal({ isOpen: true, type: 'strategyMatrix' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 策略與型態勝率</button>
                 <button onClick={() => setModal({ isOpen: true, type: 'edgeCorrelation' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 優勢分數與盈虧</button>
+                <button onClick={() => setModal({ isOpen: true, type: 'holdingAnalysis' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 持有週期與出場</button>
+                <button onClick={() => setModal({ isOpen: true, type: 'journalReport' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 交易日誌週報</button>
               </div>
             )}
 
@@ -437,12 +463,27 @@
                 </div>
               </div>
             )))}
-            {tab === 'history' && (completed.length === 0 ? renderEmptyState('暫無歷史報告，完成買賣檢討後即可生成') : completed.map(t => {
+            {tab === 'history' && (
+              <div className="mb-4 flex flex-wrap gap-2 animate-fade-in-up">
+                <select value={filterStrategy} onChange={(e) => setFilterStrategy(e.target.value)} className="bg-white border border-gray-200 text-gray-700 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-indigo-500">
+                  <option value="ALL">所有策略</option>
+                  {availableStrategies.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button onClick={() => setFilterCompleteOnly(!filterCompleteOnly)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${filterCompleteOnly ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                  {filterCompleteOnly ? '✓ 僅顯示完整資料' : '顯示所有資料'}
+                </button>
+              </div>
+            )}
+            {tab === 'history' && (completed.length === 0 ? renderEmptyState('暫無符合條件的歷史報告') : completed.map(t => {
               const isProfit = t.pnlPercent >= 0;
               return (
                 <div key={t.id} onClick={() => onSelect(t)} className="bg-white rounded-2xl p-4 card-shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer animate-fade-in-up hover:border-purple-200 transition-colors">
                   <div>
-                    <div className="flex items-center gap-2"><span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span><span className={`badge ${isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{isProfit ? '📈 獲利' : '📉 虧損'}</span></div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xl text-gray-800 tracking-tight">{t.ticker}</span>
+                      <span className={`badge ${isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{isProfit ? '📈 獲利' : '📉 虧損'}</span>
+                      {!isTradeComplete(t) && <span className="badge bg-amber-50 text-amber-700 border border-amber-100" title="資料不完整，可能影響分析準確度">⚠️ 缺漏</span>}
+                    </div>
                     <p className="text-xs text-gray-400 font-semibold mt-1">持倉 {t.holdingDays}天 | {formatDateShort(t.buyDate)} ➜ {formatDateShort(t.sellDate)}</p>
                   </div>
                   <p className={`text-xl font-black ${isProfit ? 'gradient-text-profit' : 'gradient-text-loss'}`}>{isProfit ? '+' : ''}{t.pnlPercent.toFixed(2)}%</p>
@@ -521,6 +562,63 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'holdingAnalysis'} onClose={closeModal} title="持有週期與出場品質" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500">分析您抱單的耐心，找出是否太早停利或死抱虧損。</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 text-center">
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">獲利單平均持倉</p>
+                  <p className="text-2xl font-black text-emerald-700">{avgWinDays} <span className="text-xs font-bold text-emerald-600/70">天</span></p>
+                </div>
+                <div className="bg-rose-50 rounded-xl p-3 border border-rose-100 text-center">
+                  <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">虧損單平均持倉</p>
+                  <p className="text-2xl font-black text-rose-700">{avgLossDays} <span className="text-xs font-bold text-rose-600/70">天</span></p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-xs text-gray-600 border border-gray-100">
+                <p className="font-bold mb-1">💡 分析洞察：</p>
+                {avgWinDays !== '--' && avgLossDays !== '--' ? (
+                  parseFloat(avgLossDays) > parseFloat(avgWinDays)
+                    ? <p className="text-rose-600 font-bold">您的虧損單抱得比獲利單還久！請注意是否捨不得停損，或是一有小賺就急著跑。</p>
+                    : <p className="text-emerald-600 font-bold">您的獲利單抱得比虧損單久，這是很好的「截斷虧損，讓利潤奔跑」的現象。</p>
+                ) : <p>資料不足，需要至少一筆獲利與一筆虧損紀錄。</p>}
+              </div>
+            </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'journalReport'} onClose={closeModal} title="交易日誌週報" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500">最近 7 天的交易總結與紀律表現。</p>
+              {(() => {
+                const oneWeekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+                const recentTrades = completed.filter(t => t.sellDate && t.sellDate >= oneWeekAgo.split('T')[0]);
+                const recentWins = recentTrades.filter(t => t.pnlPercent > 0);
+                const recentWinRate = recentTrades.length > 0 ? ((recentWins.length / recentTrades.length) * 100).toFixed(0) : '--';
+                const recentPnL = recentTrades.length > 0 ? (recentTrades.reduce((s, t) => s + (t.pnlPercent || 0), 0) / recentTrades.length).toFixed(2) : '--';
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-slate-50 p-2 rounded-lg text-center"><p className="text-[10px] text-gray-500 font-bold">本週交易</p><p className="text-lg font-black text-gray-800">{recentTrades.length}</p></div>
+                      <div className="bg-slate-50 p-2 rounded-lg text-center"><p className="text-[10px] text-gray-500 font-bold">勝率</p><p className={`text-lg font-black ${recentWinRate >= 50 ? 'text-emerald-600' : 'text-rose-500'}`}>{recentWinRate}%</p></div>
+                      <div className="bg-slate-50 p-2 rounded-lg text-center"><p className="text-[10px] text-gray-500 font-bold">平均盈虧</p><p className={`text-lg font-black ${recentPnL >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{recentPnL}%</p></div>
+                    </div>
+                    {recentTrades.length === 0 ? (
+                      <p className="text-center text-xs text-gray-400 py-4">本週尚無已完成的交易紀錄。</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {recentTrades.map(t => (
+                          <div key={t.id} className="border border-gray-100 rounded-lg p-2 text-xs flex justify-between items-center">
+                            <div><span className="font-bold text-gray-800">{t.ticker}</span> <span className="text-gray-400">| 紀律 {t.disciplineScore || '?'} 星</span></div>
+                            <span className={`font-bold ${t.pnlPercent >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{t.pnlPercent > 0 ? '+' : ''}{t.pnlPercent.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'edgeCorrelation'} onClose={closeModal} title="優勢分數與實際盈虧" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
