@@ -236,7 +236,7 @@
 
       return (
         <div className="app-container min-h-screen bg-gray-50 shadow-2xl relative">
-          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onEdit={t => goTo('new_trade', t)} onSelect={handleSelectTrade} onDelete={deleteTrade} onUpdatePrice={updateActivePrice} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} portfolioCapital={portfolioCapital} maxExposurePercent={maxExposurePercent} onPortfolioCapitalChange={setPortfolioCapital} onMaxExposurePercentChange={setMaxExposurePercent} />}
+          {view === 'dashboard' && <Dashboard trades={trades} onNew={() => goTo('new_trade')} onEdit={t => goTo('new_trade', t)} onCompleteEdit={t => goTo('review_trade', t)} onSelect={handleSelectTrade} onDelete={deleteTrade} onUpdatePrice={updateActivePrice} onBuy={buyFromWatchlist} onExport={handleExport} onImport={handleImport} portfolioCapital={portfolioCapital} maxExposurePercent={maxExposurePercent} onPortfolioCapitalChange={setPortfolioCapital} onMaxExposurePercentChange={setMaxExposurePercent} />}
           {view === 'new_trade' && <NewTradeForm onSave={saveNewTrade} onCancel={() => goTo('dashboard')} editTrade={currentTrade} />}
           {view === 'review_trade' && currentTrade && <ReviewTradeForm trade={currentTrade} onSave={d => completeTrade(currentTrade.id, d)} onCancel={() => goTo('dashboard')} />}
           {view === 'report' && currentTrade && <ReportView trade={currentTrade} onBack={() => goTo('dashboard')} onDelete={() => { deleteTrade(currentTrade.id); goTo('dashboard'); }} />}
@@ -248,7 +248,7 @@
     }
 
     // ---- 儀表板 ----
-    function Dashboard({ trades, onNew, onEdit, onSelect, onDelete, onUpdatePrice, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
+    function Dashboard({ trades, onNew, onEdit, onCompleteEdit, onSelect, onDelete, onUpdatePrice, onBuy, onExport, onImport, portfolioCapital, maxExposurePercent, onPortfolioCapitalChange, onMaxExposurePercentChange }) {
       const [tab, setTab] = useState('watchlist');
       const [filterStrategy, setFilterStrategy] = useState('ALL');
       const [filterCompleteOnly, setFilterCompleteOnly] = useState(false);
@@ -256,11 +256,22 @@
       const watchlist = trades.filter(t => t.status === 'watchlist');
       const active = trades.filter(t => t.status === 'active');
 
-      const isTradeComplete = (t) => {
-        return t.strategy && t.answers?.s_pattern?.text && t.buyDate && t.sellDate && t.actualBuyPrice && t.sellPrice && t.reviewNotes && t.reviewNotes.length >= 10;
+      const getMissingCompletionFields = (t) => {
+        const missing = [];
+        if (!t.sellDate) missing.push('賣出日期');
+        if (t.holdingDays === undefined || t.holdingDays === null || t.holdingDays === '') missing.push('持有天數');
+        if (!t.sellPrice || Number(t.sellPrice) <= 0) missing.push('賣出成交價');
+        if (!t.reviewNotes || t.reviewNotes.trim().length < 10) missing.push('檢討筆記');
+        return missing;
       };
 
-      let completed = trades.filter(t => t.status === 'completed');
+      const isTradeComplete = (t) => {
+        return t.strategy && t.answers?.s_pattern?.text && t.buyDate && t.actualBuyPrice && getMissingCompletionFields(t).length === 0;
+      };
+
+      const allCompleted = trades.filter(t => t.status === 'completed');
+      const incompleteTrades = allCompleted.filter(t => getMissingCompletionFields(t).length > 0);
+      let completed = allCompleted;
       if (filterCompleteOnly) {
         completed = completed.filter(isTradeComplete);
       }
@@ -270,9 +281,52 @@
 
       const availableStrategies = Array.from(new Set(trades.filter(t => t.status === 'completed').map(t => t.strategy).filter(Boolean)));
 
+      const getSampleConfidence = (sampleSize) => {
+        if (sampleSize >= 30) return { label: '樣本充足', shortLabel: '充足', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+        if (sampleSize >= 10) return { label: '初步可參考', shortLabel: '可參考', tone: 'text-sky-700 bg-sky-50 border-sky-200' };
+        return { label: '樣本偏少', shortLabel: '偏少', tone: 'text-amber-800 bg-amber-50 border-amber-200' };
+      };
+
       const totalComp = completed.length;
+      const sampleConfidence = getSampleConfidence(totalComp);
       const winRate = totalComp > 0 ? ((completed.filter(t => t.pnlPercent > 0).length / totalComp) * 100).toFixed(1) : '--';
       const avgPnL = totalComp > 0 ? (completed.reduce((s, t) => s + (t.pnlPercent || 0), 0) / totalComp).toFixed(2) : '--';
+
+      const getNetEdge = (t) => Math.round((((Number(t.edges?.long) || 0) - (Number(t.edges?.short) || 0)) * 10)) / 10;
+      const getAttributionStats = (group) => {
+        const pnlValues = group.map(t => Number(t.pnlPercent)).filter(Number.isFinite);
+        const disciplineValues = group.map(t => Number(t.disciplineScore)).filter(Number.isFinite);
+        const sampleSize = pnlValues.length;
+        return {
+          sampleSize,
+          winRate: sampleSize > 0 ? (pnlValues.filter(v => v > 0).length / sampleSize) * 100 : null,
+          avgPnL: sampleSize > 0 ? pnlValues.reduce((sum, value) => sum + value, 0) / sampleSize : null,
+          avgDiscipline: disciplineValues.length > 0 ? disciplineValues.reduce((sum, value) => sum + value, 0) / disciplineValues.length : null
+        };
+      };
+
+      const attributionTrades = completed.filter(t => Number.isFinite(Number(t.pnlPercent)));
+      const highScoreStats = getAttributionStats(attributionTrades.filter(t => getNetEdge(t) >= 3));
+      const lowScoreStats = getAttributionStats(attributionTrades.filter(t => getNetEdge(t) <= 0));
+      const overallAttributionStats = getAttributionStats(attributionTrades);
+      const conditionGroups = {};
+      attributionTrades.forEach(t => {
+        METS_CHECKLIST.forEach(category => category.items.forEach(item => {
+          const answer = t.answers?.[item.id];
+          if (!answer || !answer.text) return;
+          const key = `${item.id}__${answer.text}`;
+          if (!conditionGroups[key]) conditionGroups[key] = { key, itemLabel: item.label, answerText: answer.text, trades: [] };
+          conditionGroups[key].trades.push(t);
+        }));
+      });
+      const conditionAttributions = Object.values(conditionGroups)
+        .map(group => {
+          const stats = getAttributionStats(group.trades);
+          return { ...group, ...stats, pnlDelta: stats.avgPnL === null || overallAttributionStats.avgPnL === null ? null : stats.avgPnL - overallAttributionStats.avgPnL };
+        })
+        .filter(group => group.sampleSize >= 3 && group.pnlDelta !== null)
+        .sort((a, b) => Math.abs(b.pnlDelta) - Math.abs(a.pnlDelta))
+        .slice(0, 6);
 
       // Holding Period & Exit Quality Analysis
       const winners = completed.filter(t => t.pnlPercent > 0);
@@ -379,17 +433,22 @@
               </div>
             </div>
               <div className="grid grid-cols-3 gap-3 mt-5 max-w-3xl">
-              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className="text-xl font-extrabold">{totalComp}</p><p className="text-xs text-white/80 mt-0.5">總交易</p></div>
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className="text-xl font-extrabold">{totalComp}</p><p className="text-xs text-white/80 mt-0.5">分析樣本</p></div>
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(winRate) >= 50 ? 'text-emerald-300' : 'text-rose-300'}`}>{winRate}%</p><p className="text-xs text-white/80 mt-0.5">勝率</p></div>
               <div className="bg-white/15 backdrop-blur-md rounded-2xl p-3 text-center border border-white/5"><p className={`text-xl font-extrabold ${parseFloat(avgPnL) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{parseFloat(avgPnL) >= 0 ? '+' : ''}{avgPnL}%</p><p className="text-xs text-white/80 mt-0.5">平均盈虧</p></div>
             </div>
-            {tab === 'history' && completed.length > 0 && (
+            {tab === 'history' && allCompleted.length > 0 && (
+              <>
               <div className="mt-4 flex gap-2 overflow-x-auto hide-scrollbar">
+                <button onClick={() => setModal({ isOpen: true, type: 'dataCompletion' })} className={`shrink-0 text-white text-xs font-bold px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${incompleteTrades.length > 0 ? 'bg-amber-400/20 hover:bg-amber-400/30 border-amber-200/30' : 'bg-white/20 hover:bg-white/30 border-white/10'}`}><Icons.BarChart size={14} /> 資料補齊 {incompleteTrades.length > 0 ? `(${incompleteTrades.length})` : '✓'}</button>
                 <button onClick={() => setModal({ isOpen: true, type: 'strategyMatrix' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 策略與型態勝率</button>
                 <button onClick={() => setModal({ isOpen: true, type: 'edgeCorrelation' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 優勢分數與盈虧</button>
+                <button onClick={() => setModal({ isOpen: true, type: 'scoreAttribution' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> M.E.T.S. 分數歸因</button>
                 <button onClick={() => setModal({ isOpen: true, type: 'holdingAnalysis' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 持有週期與出場</button>
                 <button onClick={() => setModal({ isOpen: true, type: 'journalReport' })} className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-colors flex items-center gap-1.5"><Icons.BarChart size={14} /> 交易日誌週報</button>
               </div>
+              <p className={`mt-2 inline-flex rounded-lg border px-2 py-1 text-[11px] font-bold ${sampleConfidence.tone}`}>目前分析樣本 {totalComp} 筆：{sampleConfidence.label}</p>
+              </>
             )}
 
               {tab === 'active' && (
@@ -469,9 +528,13 @@
                   <option value="ALL">所有策略</option>
                   {availableStrategies.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <button onClick={() => setFilterCompleteOnly(!filterCompleteOnly)} className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${filterCompleteOnly ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                <button onClick={() => setFilterCompleteOnly(!filterCompleteOnly)} className={`min-h-[40px] px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${filterCompleteOnly ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
                   {filterCompleteOnly ? '✓ 僅顯示完整資料' : '顯示所有資料'}
                 </button>
+                <button onClick={() => setModal({ isOpen: true, type: 'dataCompletion' })} className={`min-h-[40px] px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${incompleteTrades.length > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                  {incompleteTrades.length > 0 ? `補齊 ${incompleteTrades.length} 筆資料` : '✓ 資料完整'}
+                </button>
+                <span className={`inline-flex min-h-[40px] items-center rounded-xl border px-3 py-2 text-xs font-bold ${sampleConfidence.tone}`}>樣本 {totalComp} 筆 · {sampleConfidence.label}</span>
               </div>
             )}
             {tab === 'history' && (completed.length === 0 ? renderEmptyState('暫無符合條件的歷史報告') : completed.map(t => {
@@ -484,7 +547,7 @@
                       <span className={`badge ${isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{isProfit ? '📈 獲利' : '📉 虧損'}</span>
                       {!isTradeComplete(t) && <span className="badge bg-amber-50 text-amber-700 border border-amber-100" title="資料不完整，可能影響分析準確度">⚠️ 缺漏</span>}
                     </div>
-                    <p className="text-xs text-gray-400 font-semibold mt-1">持倉 {t.holdingDays}天 | {formatDateShort(t.buyDate)} ➜ {formatDateShort(t.sellDate)}</p>
+                    <p className="text-xs text-gray-400 font-semibold mt-1">持倉 {t.holdingDays ?? '--'}天 | {formatDateShort(t.buyDate)} ➜ {t.sellDate ? formatDateShort(t.sellDate) : '--'}</p>
                   </div>
                   <p className={`text-xl font-black ${isProfit ? 'gradient-text-profit' : 'gradient-text-loss'}`}>{isProfit ? '+' : ''}{t.pnlPercent.toFixed(2)}%</p>
                 </div>
@@ -529,9 +592,39 @@
           <Modal isOpen={modal.isOpen && modal.type === 'priceUpdate'} onClose={closeModal} title={`更新 ${modal.trade?.ticker} 價格`} actions={<><button onClick={closeModal} className="px-4 py-2 text-xs text-gray-500 font-bold">取消</button><button onClick={savePriceUpdate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">儲存並檢查</button></>}>
             <div className="space-y-3"><p>記錄目前市價及進場以來的最高價格，系統將檢查是否有獲利回吐的情況。</p><div><label className="block text-xs font-bold text-gray-700 mb-1">目前市價</label><input id="current-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.currentPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">進場後最高價</label><input id="high-price-input" type="number" inputmode="decimal" step="0.01" defaultValue={modal.trade?.highPrice || ''} className="w-full p-3 border rounded-xl text-sm font-bold" placeholder="0.00" /></div></div>
           </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'dataCompletion'} onClose={closeModal} title="資料補齊中心" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">集中處理已完成交易中缺少的賣出日期、持有天數、賣出成交價或檢討筆記。補齊後，統計與分析才會納入完整資料。</p>
+              {incompleteTrades.length === 0 ? (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center text-emerald-700">
+                  <p className="font-bold">✓ 所有已完成交易資料完整</p>
+                  <p className="mt-1 text-[11px] text-emerald-600">目前沒有需要補齊的結案交易。</p>
+                </div>
+              ) : (
+                <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                  {incompleteTrades.map(t => {
+                    const missing = getMissingCompletionFields(t);
+                    return (
+                      <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-800">{t.ticker} <span className="ml-1 text-[10px] font-medium text-gray-400">{t.strategy || '未設定策略'}</span></p>
+                          <p className="mt-1 text-[11px] font-medium leading-relaxed text-amber-800">待補：{missing.join('、')}</p>
+                        </div>
+                        <button onClick={() => { closeModal(); onCompleteEdit(t); }} className="inline-flex min-h-[44px] shrink-0 items-center rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white shadow-sm btn-press">前往補齊</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Modal>
           <Modal isOpen={modal.isOpen && modal.type === 'strategyMatrix'} onClose={closeModal} title="策略與型態勝率矩陣" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
             <div className="space-y-4">
               <p className="text-xs text-gray-500">分析不同策略與圖表型態的勝率，找出您的最佳獲利模式。</p>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+                <p className="font-bold text-slate-700">樣本可信度門檻</p>
+                <p className="mt-1">少於 10 筆為「樣本偏少」；10–29 筆為「初步可參考」；30 筆以上為「樣本充足」。請勿只根據少量交易下結論。</p>
+              </div>
               <p className="text-[11px] font-bold text-indigo-500 md:hidden">← 左右滑動查看完整矩陣 →</p>
               <div className="overflow-x-auto hide-scrollbar border border-gray-100 rounded-xl">
                 <table className="w-full text-left border-collapse text-xs">
@@ -554,6 +647,7 @@
                             <td key={p} className="p-3 text-center whitespace-nowrap">
                               <span className={`font-bold ${winPct >= 50 ? 'text-emerald-600' : 'text-rose-500'}`}>{winPct.toFixed(0)}%</span>
                               <span className="text-[10px] text-gray-400 block mt-0.5">({wins}/{subset.length})</span>
+                              <span className={`mt-1 inline-block rounded border px-1 py-0.5 text-[9px] font-bold ${getSampleConfidence(subset.length).tone}`}>{getSampleConfidence(subset.length).shortLabel}</span>
                             </td>
                           );
                         })}
@@ -561,6 +655,53 @@
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </Modal>
+          <Modal isOpen={modal.isOpen && modal.type === 'scoreAttribution'} onClose={closeModal} title="M.E.T.S. 分數歸因" actions={<button onClick={closeModal} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs w-full">關閉</button>}>
+            <div className="max-h-[58vh] space-y-4 overflow-y-auto pr-1">
+              <p className="text-xs text-gray-500">以淨優勢分數（Long − Short）比較交易結果；高分組為至少 +3 分，低分組為 0 分或以下。此工具呈現關聯，不能單獨證明因果。</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[{ label: '高分組', threshold: '≥ +3 分', stats: highScoreStats, tone: 'emerald' }, { label: '低分組', threshold: '≤ 0 分', stats: lowScoreStats, tone: 'rose' }].map(group => (
+                  <div key={group.label} className={`rounded-xl border p-3 ${group.tone === 'emerald' ? 'border-emerald-100 bg-emerald-50' : 'border-rose-100 bg-rose-50'}`}>
+                    <p className={`text-[10px] font-bold ${group.tone === 'emerald' ? 'text-emerald-600' : 'text-rose-600'}`}>{group.label} · {group.threshold}</p>
+                    <p className={`mt-1 text-xl font-black ${group.tone === 'emerald' ? 'text-emerald-700' : 'text-rose-700'}`}>{group.stats.sampleSize} <span className="text-[10px]">筆</span></p>
+                    <p className="mt-1 text-[11px] text-gray-600">勝率 {group.stats.winRate === null ? '--' : `${group.stats.winRate.toFixed(0)}%`}</p>
+                    <p className="text-[11px] text-gray-600">平均盈虧 {group.stats.avgPnL === null ? '--' : `${group.stats.avgPnL >= 0 ? '+' : ''}${group.stats.avgPnL.toFixed(2)}%`}</p>
+                    <p className="text-[11px] text-gray-600">紀律 {group.stats.avgDiscipline === null ? '--' : `${group.stats.avgDiscipline.toFixed(1)} ★`}</p>
+                    <p className={`mt-2 inline-block rounded border px-1.5 py-0.5 text-[9px] font-bold ${getSampleConfidence(group.stats.sampleSize).tone}`}>{getSampleConfidence(group.stats.sampleSize).shortLabel}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                <p className="font-bold text-slate-700">分數洞察</p>
+                {highScoreStats.sampleSize > 0 && lowScoreStats.sampleSize > 0 ? (
+                  highScoreStats.avgPnL > lowScoreStats.avgPnL
+                    ? <p className="mt-1 text-emerald-700">高分組平均盈虧較低分組高 {(highScoreStats.avgPnL - lowScoreStats.avgPnL).toFixed(2)} 個百分點；請持續累積樣本以確認這個優勢是否穩定。</p>
+                    : <p className="mt-1 text-amber-700">目前高分組未優於低分組。建議回顧進出場執行與市場環境，而非只依賴事前分數。</p>
+                ) : <p className="mt-1">資料不足：需要同時有至少一筆高分組與低分組的已完成交易。</p>}
+              </div>
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-gray-700">條件關聯排行</p>
+                  <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold ${getSampleConfidence(overallAttributionStats.sampleSize).tone}`}>整體 {overallAttributionStats.sampleSize} 筆</span>
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-gray-500">僅列出至少 3 筆相同回答的條件，並按其平均盈虧相對於目前篩選結果的偏離程度排序。</p>
+                {conditionAttributions.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-3 text-center text-[11px] text-gray-400">尚未有足夠的重複條件樣本。請累積至少 3 筆相同的 M.E.T.S. 回答後再比較。</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {conditionAttributions.map(group => (
+                      <div key={group.key} className="rounded-xl border border-gray-100 bg-white p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0"><p className="text-[10px] font-bold text-gray-400">{group.itemLabel}</p><p className="mt-0.5 font-bold text-gray-800">{group.answerText}</p></div>
+                          <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${group.pnlDelta >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>{group.pnlDelta >= 0 ? '+' : ''}{group.pnlDelta.toFixed(2)} pp</span>
+                        </div>
+                        <p className="mt-2 text-[11px] text-gray-500">{group.sampleSize} 筆 · 勝率 {group.winRate.toFixed(0)}% · 平均盈虧 {group.avgPnL >= 0 ? '+' : ''}{group.avgPnL.toFixed(2)}% · 紀律 {group.avgDiscipline === null ? '--' : `${group.avgDiscipline.toFixed(1)} ★`}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </Modal>
@@ -934,9 +1075,9 @@
     // ---- 交易後檢討 ----
     function ReviewTradeForm({ trade, onSave, onCancel }) {
       const [actualBuyPrice, setActualBuyPrice] = useState(trade.actualBuyPrice || trade.targetBuyPrice || '');
-      const [sellDate, setSellDate] = useState(new Date().toISOString().split('T')[0]);
-      const [sellPrice, setSellPrice] = useState('');
-      const [reviewNotes, setReviewNotes] = useState('');
+      const [sellDate, setSellDate] = useState(trade.sellDate || new Date().toISOString().split('T')[0]);
+      const [sellPrice, setSellPrice] = useState(trade.sellPrice ?? '');
+      const [reviewNotes, setReviewNotes] = useState(trade.reviewNotes || '');
       const [modal, setModal] = useState({ isOpen: false, message: '' });
 
       const handleSave = () => {
@@ -944,6 +1085,7 @@
         const sp = parseFloat(sellPrice);
         if (isNaN(bp) || bp <= 0) { setModal({ isOpen: true, message: '請輸入有效的實際買入價格。' }); return; }
         if (isNaN(sp) || sp <= 0) { setModal({ isOpen: true, message: '請輸入有效的實際賣出價格。' }); return; }
+        if (reviewNotes.trim().length < 10) { setModal({ isOpen: true, message: `請至少輸入 10 個字的交易檢討筆記，目前字數：${reviewNotes.trim().length}` }); return; }
         const holdingDays = calcHoldingDays(trade.buyDate, sellDate);
         const pnlPercent = calcPnL(bp, sp);
 
@@ -981,7 +1123,7 @@
         <div className="flex flex-col min-h-screen bg-white">
           <header className="flex items-center px-3 py-2.5 border-b bg-white sticky top-0 z-10">
             <button onClick={onCancel} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -ml-2 text-gray-500 rounded-full hover:bg-gray-100" aria-label="返回"><Icons.ArrowLeft size={22} /></button>
-            <h1 className="text-base font-extrabold flex-1 text-center pr-8 text-gray-800">完成交易與檢討 ({trade.ticker})</h1>
+            <h1 className="text-base font-extrabold flex-1 text-center pr-8 text-gray-800">{trade.status === 'completed' ? '補齊交易資料' : '完成交易與檢討'} ({trade.ticker})</h1>
           </header>
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-40">
             <div className="bg-slate-50 p-4 rounded-3xl border border-gray-100 flex justify-between items-center animate-fade-in-up">
@@ -999,7 +1141,7 @@
           </main>
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,16px))] shadow-[0_-8px_24px_rgba(0,0,0,0.04)] z-20">
             <div className="app-container relative">
-              <button onClick={handleSave} className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 text-white rounded-2xl py-3.5 font-bold text-sm shadow-md btn-press">確認完成檢討報告</button>
+              <button onClick={handleSave} className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 text-white rounded-2xl py-3.5 font-bold text-sm shadow-md btn-press">{trade.status === 'completed' ? '儲存補齊資料' : '確認完成檢討報告'}</button>
             </div>
           </div>
           <Modal isOpen={modal.isOpen} onClose={() => setModal({ isOpen: false })} title="提示" actions={<button onClick={() => setModal({ isOpen: false })} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs">好</button>}>{modal.message}</Modal>
